@@ -59,7 +59,9 @@ function AuthPage() {
         navigate({ to: "/dashboard", replace: true });
       }
     } catch (err) {
-      toast.error((err as Error).message);
+      const message = (err as Error).message;
+      setErrorMsg(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
