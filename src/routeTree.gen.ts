@@ -12,7 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedGateRouteImport } from './routes/_authenticated/gate'
+import { Route as AuthenticatedVerificationRouteImport } from './routes/_authenticated/verification'
 import { Route as AuthenticatedYardRouteImport } from './routes/_authenticated/yard'
 import { Route as AuthenticatedZonesRouteImport } from './routes/_authenticated/zones'
 import { Route as AuthenticatedMSlugRouteImport } from './routes/_authenticated/m.$slug'
@@ -31,11 +34,27 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedApprovalsRoute = AuthenticatedApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedGateRoute = AuthenticatedGateRouteImport.update({
+  id: '/gate',
+  path: '/gate',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedVerificationRoute =
+  AuthenticatedVerificationRouteImport.update({
+    id: '/verification',
+    path: '/verification',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedYardRoute = AuthenticatedYardRouteImport.update({
   id: '/yard',
   path: '/yard',
@@ -55,7 +74,10 @@ const AuthenticatedMSlugRoute = AuthenticatedMSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/approvals': typeof AuthenticatedApprovalsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/gate': typeof AuthenticatedGateRoute
+  '/verification': typeof AuthenticatedVerificationRoute
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/m/$slug': typeof AuthenticatedMSlugRoute
@@ -63,7 +85,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/approvals': typeof AuthenticatedApprovalsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/gate': typeof AuthenticatedGateRoute
+  '/verification': typeof AuthenticatedVerificationRoute
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/m/$slug': typeof AuthenticatedMSlugRoute
@@ -73,22 +98,46 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/approvals': typeof AuthenticatedApprovalsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/gate': typeof AuthenticatedGateRoute
+  '/_authenticated/verification': typeof AuthenticatedVerificationRoute
   '/_authenticated/yard': typeof AuthenticatedYardRoute
   '/_authenticated/zones': typeof AuthenticatedZonesRoute
   '/_authenticated/m/$slug': typeof AuthenticatedMSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/yard' | '/zones' | '/m/$slug'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/approvals'
+    | '/dashboard'
+    | '/gate'
+    | '/verification'
+    | '/yard'
+    | '/zones'
+    | '/m/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/yard' | '/zones' | '/m/$slug'
+  to:
+    | '/'
+    | '/auth'
+    | '/approvals'
+    | '/dashboard'
+    | '/gate'
+    | '/verification'
+    | '/yard'
+    | '/zones'
+    | '/m/$slug'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/approvals'
     | '/_authenticated/dashboard'
+    | '/_authenticated/gate'
+    | '/_authenticated/verification'
     | '/_authenticated/yard'
     | '/_authenticated/zones'
     | '/_authenticated/m/$slug'
@@ -123,11 +172,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/approvals': {
+      id: '/_authenticated/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof AuthenticatedApprovalsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/gate': {
+      id: '/_authenticated/gate'
+      path: '/gate'
+      fullPath: '/gate'
+      preLoaderRoute: typeof AuthenticatedGateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/verification': {
+      id: '/_authenticated/verification'
+      path: '/verification'
+      fullPath: '/verification'
+      preLoaderRoute: typeof AuthenticatedVerificationRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/yard': {
@@ -155,14 +225,20 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedGateRoute: typeof AuthenticatedGateRoute
+  AuthenticatedVerificationRoute: typeof AuthenticatedVerificationRoute
   AuthenticatedYardRoute: typeof AuthenticatedYardRoute
   AuthenticatedZonesRoute: typeof AuthenticatedZonesRoute
   AuthenticatedMSlugRoute: typeof AuthenticatedMSlugRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedGateRoute: AuthenticatedGateRoute,
+  AuthenticatedVerificationRoute: AuthenticatedVerificationRoute,
   AuthenticatedYardRoute: AuthenticatedYardRoute,
   AuthenticatedZonesRoute: AuthenticatedZonesRoute,
   AuthenticatedMSlugRoute: AuthenticatedMSlugRoute,
