@@ -41,9 +41,8 @@ function MaintenanceHandover() {
         .from("work_orders")
         .update({
           status: "Released",
-          release_verifier: form[`verifier_${order.id}`],
-          release_notes: form[`notes_${order.id}`] || null,
-          released_at: new Date().toISOString(),
+          released_verified_by: form[`verifier_${order.id}`],
+          handover_condition: form[`notes_${order.id}`] || null,
         })
         .eq("id", order.id);
       if (error) throw error;
