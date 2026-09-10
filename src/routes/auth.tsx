@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -113,7 +113,10 @@ function AuthPage() {
           variant="outline"
           className="mt-3 w-full"
           onClick={() =>
-            lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin })
+            supabase.auth.signInWithOAuth({
+              provider: "google",
+              options: { redirectTo: window.location.origin },
+            })
           }
         >
           Continue with Google
