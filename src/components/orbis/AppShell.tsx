@@ -12,8 +12,8 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { GlobalSearch } from "./GlobalSearch";
 
 function Icon({ name, className }: { name: string; className?: string }) {
-  const C = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[name];
-  return C ? <C className={className} /> : null;
+  const C = (Icons as unknown as Record<string, React.ComponentType<Record<string, unknown>>>)[name];
+  return C ? <C className={className ?? ""} /> : null;
 }
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
@@ -31,7 +31,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
               return (
                 <li key={item.to}>
                   <Link
-                    to={item.to}
+                    to={item.to as never}
                     onClick={onNavigate}
                     className={cn(
                       "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
@@ -63,7 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     await queryClient.cancelQueries();
     queryClient.clear();
     await supabase.auth.signOut();
-    navigate({ to: "/auth", replace: true });
+    navigate({ to: "/auth" as never, replace: true });
   }
 
   return (
