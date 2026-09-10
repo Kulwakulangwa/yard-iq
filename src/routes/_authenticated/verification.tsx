@@ -24,11 +24,11 @@ async function raiseException(input: {
   type: string;
   expected: string;
   actual: string;
-  loadId?: string;
-  tripId?: string;
-  vehicleId?: string;
-  severity?: string;
-  reason?: string;
+  loadId?: string | undefined;
+  tripId?: string | undefined;
+  vehicleId?: string | undefined;
+  severity?: string | undefined;
+  reason?: string | undefined;
 }) {
   const { data: existing } = await db.from("exceptions").select("exception_number");
   const number = nextReference(
