@@ -37,6 +37,7 @@ export const nav: NavGroup[] = [
       { label: "Vehicle Inspections", icon: "SearchCheck", to: "/m/inspections", module: "vehicle_inspections" },
       { label: "Tires & Assets", icon: "CircleDot", to: "/m/tires", module: "tires" },
       { label: "Tire Movements", icon: "ArrowLeftRight", to: "/m/tire-movements", module: "tire_movements" },
+      { label: "Maintenance Handover", icon: "Factory", to: "/maintenance-handover" },
       { label: "Incidents & Cases", icon: "ShieldAlert", to: "/m/incidents", module: "incidents" },
       { label: "Police Cases", icon: "Landmark", to: "/m/police-cases", module: "police_cases" },
       { label: "Approvals", icon: "BadgeCheck", to: "/approvals" },
