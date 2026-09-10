@@ -74,6 +74,62 @@ export type Database = {
         }
         Relationships: []
       }
+      contracts: {
+        Row: {
+          contract_amount: number
+          contract_currency: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          end_date: string | null
+          id: string
+          notes: string | null
+          route: string | null
+          start_date: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          contract_amount?: number
+          contract_currency?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          route?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          contract_amount?: number
+          contract_currency?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          route?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -122,9 +178,70 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_payments: {
+        Row: {
+          amount_tzs: number
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_type: string
+          period_label: string | null
+          reference_trip: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount_tzs?: number
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_type?: string
+          period_label?: string | null
+          reference_trip?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount_tzs?: number
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_type?: string
+          period_label?: string | null
+          reference_trip?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_payments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_payments_reference_trip_fkey"
+            columns: ["reference_trip"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drivers: {
         Row: {
           assigned_vehicle: string | null
+          base_location: string | null
           created_at: string
           created_by: string | null
           driver_code: string | null
@@ -132,6 +249,7 @@ export type Database = {
           id: string
           licence_expiry: string | null
           licence_number: string | null
+          monthly_salary_tzs: number | null
           notes: string | null
           phone: string | null
           status: string
@@ -140,6 +258,7 @@ export type Database = {
         }
         Insert: {
           assigned_vehicle?: string | null
+          base_location?: string | null
           created_at?: string
           created_by?: string | null
           driver_code?: string | null
@@ -147,6 +266,7 @@ export type Database = {
           id?: string
           licence_expiry?: string | null
           licence_number?: string | null
+          monthly_salary_tzs?: number | null
           notes?: string | null
           phone?: string | null
           status?: string
@@ -155,6 +275,7 @@ export type Database = {
         }
         Update: {
           assigned_vehicle?: string | null
+          base_location?: string | null
           created_at?: string
           created_by?: string | null
           driver_code?: string | null
@@ -162,6 +283,7 @@ export type Database = {
           id?: string
           licence_expiry?: string | null
           licence_number?: string | null
+          monthly_salary_tzs?: number | null
           notes?: string | null
           phone?: string | null
           status?: string
@@ -345,6 +467,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           vehicle_id: string | null
+          volume_liters: number | null
           work_order_id: string | null
         }
         Insert: {
@@ -366,6 +489,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vehicle_id?: string | null
+          volume_liters?: number | null
           work_order_id?: string | null
         }
         Update: {
@@ -387,6 +511,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vehicle_id?: string | null
+          volume_liters?: number | null
           work_order_id?: string | null
         }
         Relationships: [
@@ -713,11 +838,20 @@ export type Database = {
           id: string
           invoice_number: string
           load_id: string | null
+          paid_amount_tzs: number | null
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          sent_at: string | null
           status: string
+          subtotal_tzs: number | null
           tax: number | null
+          total_amount_tzs: number | null
           trip_id: string | null
           updated_at: string
           updated_by: string | null
+          vat_amount_tzs: number | null
+          vat_percent: number | null
         }
         Insert: {
           amount?: number
@@ -730,11 +864,20 @@ export type Database = {
           id?: string
           invoice_number: string
           load_id?: string | null
+          paid_amount_tzs?: number | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          sent_at?: string | null
           status?: string
+          subtotal_tzs?: number | null
           tax?: number | null
+          total_amount_tzs?: number | null
           trip_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          vat_amount_tzs?: number | null
+          vat_percent?: number | null
         }
         Update: {
           amount?: number
@@ -747,11 +890,20 @@ export type Database = {
           id?: string
           invoice_number?: string
           load_id?: string | null
+          paid_amount_tzs?: number | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          sent_at?: string | null
           status?: string
+          subtotal_tzs?: number | null
           tax?: number | null
+          total_amount_tzs?: number | null
           trip_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          vat_amount_tzs?: number | null
+          vat_percent?: number | null
         }
         Relationships: [
           {
@@ -882,6 +1034,48 @@ export type Database = {
           },
         ]
       }
+      operational_expenses: {
+        Row: {
+          amount_tzs: number
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string
+          expense_date: string
+          id: string
+          notes: string | null
+          receipt_url: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount_tzs?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          receipt_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount_tzs?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          receipt_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       police_cases: {
         Row: {
           case_number: string | null
@@ -961,8 +1155,10 @@ export type Database = {
       }
       technicians: {
         Row: {
+          address: string | null
           created_at: string
           created_by: string | null
+          email: string | null
           full_name: string
           id: string
           phone: string | null
@@ -972,8 +1168,10 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string
           created_by?: string | null
+          email?: string | null
           full_name: string
           id?: string
           phone?: string | null
@@ -983,8 +1181,10 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string
           created_by?: string | null
+          email?: string | null
           full_name?: string
           id?: string
           phone?: string | null
@@ -1135,19 +1335,85 @@ export type Database = {
           },
         ]
       }
+      trip_financials: {
+        Row: {
+          advance_input_type: string
+          advance_paid_tzs: number
+          advance_paid_usd: number
+          advance_value: number
+          contract_amount: number
+          contract_currency: string
+          created_at: string
+          created_by: string | null
+          customer_paid_tzs: number
+          fx_exchange_rate: number
+          id: string
+          total_contract_tzs: number | null
+          trip_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          advance_input_type?: string
+          advance_paid_tzs?: number
+          advance_paid_usd?: number
+          advance_value?: number
+          contract_amount?: number
+          contract_currency?: string
+          created_at?: string
+          created_by?: string | null
+          customer_paid_tzs?: number
+          fx_exchange_rate?: number
+          id?: string
+          total_contract_tzs?: number | null
+          trip_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          advance_input_type?: string
+          advance_paid_tzs?: number
+          advance_paid_usd?: number
+          advance_value?: number
+          contract_amount?: number
+          contract_currency?: string
+          created_at?: string
+          created_by?: string | null
+          customer_paid_tzs?: number
+          fx_exchange_rate?: number
+          id?: string
+          total_contract_tzs?: number | null
+          trip_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_financials_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: true
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trips: {
         Row: {
+          audited_at: string | null
+          contract_id: string | null
           created_at: string
           created_by: string | null
           customer_id: string | null
           destination: string | null
           driver_id: string | null
           id: string
+          invoice_id: string | null
           notes: string | null
           origin: string | null
           planned_arrival: string | null
           planned_departure: string | null
           planned_distance: number | null
+          settled_at: string | null
           status: string
           trailer_id: string | null
           trip_number: string
@@ -1156,17 +1422,21 @@ export type Database = {
           vehicle_id: string | null
         }
         Insert: {
+          audited_at?: string | null
+          contract_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
           destination?: string | null
           driver_id?: string | null
           id?: string
+          invoice_id?: string | null
           notes?: string | null
           origin?: string | null
           planned_arrival?: string | null
           planned_departure?: string | null
           planned_distance?: number | null
+          settled_at?: string | null
           status?: string
           trailer_id?: string | null
           trip_number: string
@@ -1175,17 +1445,21 @@ export type Database = {
           vehicle_id?: string | null
         }
         Update: {
+          audited_at?: string | null
+          contract_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
           destination?: string | null
           driver_id?: string | null
           id?: string
+          invoice_id?: string | null
           notes?: string | null
           origin?: string | null
           planned_arrival?: string | null
           planned_departure?: string | null
           planned_distance?: number | null
+          settled_at?: string | null
           status?: string
           trailer_id?: string | null
           trip_number?: string
@@ -1301,6 +1575,72 @@ export type Database = {
           },
           {
             foreignKeyName: "vehicle_inspections_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_maintenance: {
+        Row: {
+          completed_at: string | null
+          cost_tzs: number
+          created_at: string
+          created_by: string | null
+          description: string | null
+          duration_hours: number | null
+          id: string
+          maintenance_date: string
+          paid_amount: number
+          status: string
+          technician_id: string | null
+          updated_at: string
+          updated_by: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          cost_tzs?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_hours?: number | null
+          id?: string
+          maintenance_date?: string
+          paid_amount?: number
+          status?: string
+          technician_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          cost_tzs?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_hours?: number | null
+          id?: string
+          maintenance_date?: string
+          paid_amount?: number
+          status?: string
+          technician_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_maintenance_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_maintenance_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
