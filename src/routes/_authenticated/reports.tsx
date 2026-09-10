@@ -29,7 +29,7 @@ function Reports() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  const active = tabs.find((t) => t.key === tab) ?? tabs[0];
+  const active = tabs.find((t) => t.key === tab) ?? tabs[0]!;
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["report", active.table, from, to],
