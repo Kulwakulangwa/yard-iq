@@ -24,11 +24,11 @@ async function raiseException(input: {
   type: string;
   expected: string;
   actual: string;
-  loadId?: string;
-  tripId?: string;
-  vehicleId?: string;
-  severity?: string;
-  reason?: string;
+  loadId?: string | undefined;
+  tripId?: string | undefined;
+  vehicleId?: string | undefined;
+  severity?: string | undefined;
+  reason?: string | undefined;
 }) {
   const { data: existing } = await db.from("exceptions").select("exception_number");
   const number = nextReference(
@@ -166,13 +166,15 @@ function Verification() {
 
               {openId === l.id ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {[
-                    ["actual_quantity", "Actual quantity", "number"],
-                    ["actual_weight", "Actual weight", "number"],
-                    ["actual_seal_number", "Actual seal number", "text"],
-                    ["loading_officer", "Loading officer", "text"],
-                    ["verification_officer", "Verification officer", "text"],
-                  ].map(([key, label, type]) => (
+                  {(
+                    [
+                      ["actual_quantity", "Actual quantity", "number"],
+                      ["actual_weight", "Actual weight", "number"],
+                      ["actual_seal_number", "Actual seal number", "text"],
+                      ["loading_officer", "Loading officer", "text"],
+                      ["verification_officer", "Verification officer", "text"],
+                    ] as [string, string, string][]
+                  ).map(([key, label, type]) => (
                     <div key={key}>
                       <Label className="mb-1.5 block text-xs text-muted-foreground">{label}</Label>
                       <Input
