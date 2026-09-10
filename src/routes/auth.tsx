@@ -31,6 +31,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -41,6 +42,7 @@ function AuthPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    setErrorMsg(null);
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
@@ -57,7 +59,9 @@ function AuthPage() {
         navigate({ to: "/dashboard", replace: true });
       }
     } catch (err) {
-      toast.error((err as Error).message);
+      const message = (err as Error).message;
+      setErrorMsg(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -104,6 +108,11 @@ function AuthPage() {
               minLength={6}
             />
           </div>
+          {errorMsg ? (
+            <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {errorMsg}
+            </p>
+          ) : null}
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </Button>
