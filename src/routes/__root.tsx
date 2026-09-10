@@ -118,8 +118,8 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function SessionRefresh() {
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (_event === "SIGNED_OUT" || !session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" && window.location.pathname !== "/auth") {
         window.location.href = "/auth";
       }
     });
