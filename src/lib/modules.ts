@@ -260,6 +260,7 @@ export const modules = {
         options: ["Trip", "Fuel", "Maintenance", "Yard", "Administrative", "Emergency", "Other"],
       },
       { key: "amount", type: "number" },
+      { key: "volume_liters", label: "Volume (litres)", type: "number" },
       { key: "currency" },
       { key: "supplier" },
       { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
