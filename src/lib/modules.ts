@@ -114,6 +114,8 @@ export const modules = {
       { key: "licence_number" },
       { key: "licence_expiry", type: "date" },
       { key: "assigned_vehicle" },
+      { key: "monthly_salary_tzs", label: "Monthly salary (TZS)", type: "number" },
+      { key: "base_location" },
       { key: "status", type: "select", options: ["Available", "On Trip", "Suspended", "Off Duty"] },
       { key: "notes", type: "textarea" },
     ],
