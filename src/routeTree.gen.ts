@@ -14,16 +14,22 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedFinanceRouteImport } from './routes/_authenticated/finance'
 import { Route as AuthenticatedGateRouteImport } from './routes/_authenticated/gate'
 import { Route as AuthenticatedMaintenanceHandoverRouteImport } from './routes/_authenticated/maintenance-handover'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedTechniciansRouteImport } from './routes/_authenticated/technicians'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedVerificationRouteImport } from './routes/_authenticated/verification'
+import { Route as AuthenticatedVoucherRouteImport } from './routes/_authenticated/voucher'
 import { Route as AuthenticatedYardRouteImport } from './routes/_authenticated/yard'
 import { Route as AuthenticatedZonesRouteImport } from './routes/_authenticated/zones'
+import { Route as AuthenticatedDriversIndexRouteImport } from './routes/_authenticated/drivers.index'
+import { Route as AuthenticatedDriversDriverIdRouteImport } from './routes/_authenticated/drivers.$driverId'
 import { Route as AuthenticatedMSlugRouteImport } from './routes/_authenticated/m.$slug'
 import { Route as AuthenticatedVehiclesIndexRouteImport } from './routes/_authenticated/vehicles.index'
+import { Route as AuthenticatedVehiclesVehicleIdRouteImport } from './routes/_authenticated/vehicles.$vehicleId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -49,6 +55,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFinanceRoute = AuthenticatedFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedGateRoute = AuthenticatedGateRouteImport.update({
   id: '/gate',
   path: '/gate',
@@ -70,6 +81,12 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTechniciansRoute =
+  AuthenticatedTechniciansRouteImport.update({
+    id: '/technicians',
+    path: '/technicians',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -81,6 +98,11 @@ const AuthenticatedVerificationRoute =
     path: '/verification',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedVoucherRoute = AuthenticatedVoucherRouteImport.update({
+  id: '/voucher',
+  path: '/voucher',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedYardRoute = AuthenticatedYardRouteImport.update({
   id: '/yard',
   path: '/yard',
@@ -91,6 +113,18 @@ const AuthenticatedZonesRoute = AuthenticatedZonesRouteImport.update({
   path: '/zones',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDriversIndexRoute =
+  AuthenticatedDriversIndexRouteImport.update({
+    id: '/drivers/',
+    path: '/drivers/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDriversDriverIdRoute =
+  AuthenticatedDriversDriverIdRouteImport.update({
+    id: '/drivers/$driverId',
+    path: '/drivers/$driverId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMSlugRoute = AuthenticatedMSlugRouteImport.update({
   id: '/m/$slug',
   path: '/m/$slug',
@@ -102,21 +136,33 @@ const AuthenticatedVehiclesIndexRoute =
     path: '/vehicles/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedVehiclesVehicleIdRoute =
+  AuthenticatedVehiclesVehicleIdRouteImport.update({
+    id: '/vehicles/$vehicleId',
+    path: '/vehicles/$vehicleId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/approvals': typeof AuthenticatedApprovalsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/finance': typeof AuthenticatedFinanceRoute
   '/gate': typeof AuthenticatedGateRoute
   '/maintenance-handover': typeof AuthenticatedMaintenanceHandoverRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/technicians': typeof AuthenticatedTechniciansRoute
   '/users': typeof AuthenticatedUsersRoute
   '/verification': typeof AuthenticatedVerificationRoute
+  '/voucher': typeof AuthenticatedVoucherRoute
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
+  '/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
   '/m/$slug': typeof AuthenticatedMSlugRoute
+  '/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
+  '/drivers/': typeof AuthenticatedDriversIndexRoute
   '/vehicles/': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -124,15 +170,21 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/approvals': typeof AuthenticatedApprovalsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/finance': typeof AuthenticatedFinanceRoute
   '/gate': typeof AuthenticatedGateRoute
   '/maintenance-handover': typeof AuthenticatedMaintenanceHandoverRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/technicians': typeof AuthenticatedTechniciansRoute
   '/users': typeof AuthenticatedUsersRoute
   '/verification': typeof AuthenticatedVerificationRoute
+  '/voucher': typeof AuthenticatedVoucherRoute
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
+  '/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
   '/m/$slug': typeof AuthenticatedMSlugRoute
+  '/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
+  '/drivers': typeof AuthenticatedDriversIndexRoute
   '/vehicles': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRoutesById {
@@ -142,15 +194,21 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/approvals': typeof AuthenticatedApprovalsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/finance': typeof AuthenticatedFinanceRoute
   '/_authenticated/gate': typeof AuthenticatedGateRoute
   '/_authenticated/maintenance-handover': typeof AuthenticatedMaintenanceHandoverRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/technicians': typeof AuthenticatedTechniciansRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/verification': typeof AuthenticatedVerificationRoute
+  '/_authenticated/voucher': typeof AuthenticatedVoucherRoute
   '/_authenticated/yard': typeof AuthenticatedYardRoute
   '/_authenticated/zones': typeof AuthenticatedZonesRoute
+  '/_authenticated/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
   '/_authenticated/m/$slug': typeof AuthenticatedMSlugRoute
+  '/_authenticated/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
+  '/_authenticated/drivers/': typeof AuthenticatedDriversIndexRoute
   '/_authenticated/vehicles/': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRouteTypes {
@@ -160,15 +218,21 @@ export interface FileRouteTypes {
     | '/auth'
     | '/approvals'
     | '/dashboard'
+    | '/finance'
     | '/gate'
     | '/maintenance-handover'
     | '/reports'
     | '/settings'
+    | '/technicians'
     | '/users'
     | '/verification'
+    | '/voucher'
     | '/yard'
     | '/zones'
+    | '/drivers/$driverId'
     | '/m/$slug'
+    | '/vehicles/$vehicleId'
+    | '/drivers/'
     | '/vehicles/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -176,15 +240,21 @@ export interface FileRouteTypes {
     | '/auth'
     | '/approvals'
     | '/dashboard'
+    | '/finance'
     | '/gate'
     | '/maintenance-handover'
     | '/reports'
     | '/settings'
+    | '/technicians'
     | '/users'
     | '/verification'
+    | '/voucher'
     | '/yard'
     | '/zones'
+    | '/drivers/$driverId'
     | '/m/$slug'
+    | '/vehicles/$vehicleId'
+    | '/drivers'
     | '/vehicles'
   id:
     | '__root__'
@@ -193,15 +263,21 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/approvals'
     | '/_authenticated/dashboard'
+    | '/_authenticated/finance'
     | '/_authenticated/gate'
     | '/_authenticated/maintenance-handover'
     | '/_authenticated/reports'
     | '/_authenticated/settings'
+    | '/_authenticated/technicians'
     | '/_authenticated/users'
     | '/_authenticated/verification'
+    | '/_authenticated/voucher'
     | '/_authenticated/yard'
     | '/_authenticated/zones'
+    | '/_authenticated/drivers/$driverId'
     | '/_authenticated/m/$slug'
+    | '/_authenticated/vehicles/$vehicleId'
+    | '/_authenticated/drivers/'
     | '/_authenticated/vehicles/'
   fileRoutesById: FileRoutesById
 }
@@ -248,6 +324,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/finance': {
+      id: '/_authenticated/finance'
+      path: '/finance'
+      fullPath: '/finance'
+      preLoaderRoute: typeof AuthenticatedFinanceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/gate': {
       id: '/_authenticated/gate'
       path: '/gate'
@@ -276,6 +359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/technicians': {
+      id: '/_authenticated/technicians'
+      path: '/technicians'
+      fullPath: '/technicians'
+      preLoaderRoute: typeof AuthenticatedTechniciansRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/users': {
       id: '/_authenticated/users'
       path: '/users'
@@ -288,6 +378,13 @@ declare module '@tanstack/react-router' {
       path: '/verification'
       fullPath: '/verification'
       preLoaderRoute: typeof AuthenticatedVerificationRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/voucher': {
+      id: '/_authenticated/voucher'
+      path: '/voucher'
+      fullPath: '/voucher'
+      preLoaderRoute: typeof AuthenticatedVoucherRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/yard': {
@@ -304,6 +401,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedZonesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/drivers/': {
+      id: '/_authenticated/drivers/'
+      path: '/drivers'
+      fullPath: '/drivers/'
+      preLoaderRoute: typeof AuthenticatedDriversIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/drivers/$driverId': {
+      id: '/_authenticated/drivers/$driverId'
+      path: '/drivers/$driverId'
+      fullPath: '/drivers/$driverId'
+      preLoaderRoute: typeof AuthenticatedDriversDriverIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/m/$slug': {
       id: '/_authenticated/m/$slug'
       path: '/m/$slug'
@@ -318,36 +429,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVehiclesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/vehicles/$vehicleId': {
+      id: '/_authenticated/vehicles/$vehicleId'
+      path: '/vehicles/$vehicleId'
+      fullPath: '/vehicles/$vehicleId'
+      preLoaderRoute: typeof AuthenticatedVehiclesVehicleIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFinanceRoute: typeof AuthenticatedFinanceRoute
   AuthenticatedGateRoute: typeof AuthenticatedGateRoute
   AuthenticatedMaintenanceHandoverRoute: typeof AuthenticatedMaintenanceHandoverRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTechniciansRoute: typeof AuthenticatedTechniciansRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedVerificationRoute: typeof AuthenticatedVerificationRoute
+  AuthenticatedVoucherRoute: typeof AuthenticatedVoucherRoute
   AuthenticatedYardRoute: typeof AuthenticatedYardRoute
   AuthenticatedZonesRoute: typeof AuthenticatedZonesRoute
+  AuthenticatedDriversDriverIdRoute: typeof AuthenticatedDriversDriverIdRoute
   AuthenticatedMSlugRoute: typeof AuthenticatedMSlugRoute
+  AuthenticatedVehiclesVehicleIdRoute: typeof AuthenticatedVehiclesVehicleIdRoute
+  AuthenticatedDriversIndexRoute: typeof AuthenticatedDriversIndexRoute
   AuthenticatedVehiclesIndexRoute: typeof AuthenticatedVehiclesIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFinanceRoute: AuthenticatedFinanceRoute,
   AuthenticatedGateRoute: AuthenticatedGateRoute,
   AuthenticatedMaintenanceHandoverRoute: AuthenticatedMaintenanceHandoverRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTechniciansRoute: AuthenticatedTechniciansRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedVerificationRoute: AuthenticatedVerificationRoute,
+  AuthenticatedVoucherRoute: AuthenticatedVoucherRoute,
   AuthenticatedYardRoute: AuthenticatedYardRoute,
   AuthenticatedZonesRoute: AuthenticatedZonesRoute,
+  AuthenticatedDriversDriverIdRoute: AuthenticatedDriversDriverIdRoute,
   AuthenticatedMSlugRoute: AuthenticatedMSlugRoute,
+  AuthenticatedVehiclesVehicleIdRoute: AuthenticatedVehiclesVehicleIdRoute,
+  AuthenticatedDriversIndexRoute: AuthenticatedDriversIndexRoute,
   AuthenticatedVehiclesIndexRoute: AuthenticatedVehiclesIndexRoute,
 }
 
