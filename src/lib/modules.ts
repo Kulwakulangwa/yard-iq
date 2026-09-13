@@ -17,7 +17,16 @@ export type Field = {
   readOnly?: boolean;
 };
 
-export type RefTable = "customers" | "vehicles" | "drivers" | "trips" | "loads" | "tires" | "work_orders";
+export type RefTable =
+  | "customers"
+  | "vehicles"
+  | "drivers"
+  | "trips"
+  | "loads"
+  | "tires"
+  | "work_orders"
+  | "technicians"
+  | "contracts";
 
 export type ModuleConfig = {
   table: string;
@@ -40,6 +49,8 @@ export const REF_LABEL: Record<RefTable, string> = {
   loads: "load_reference",
   tires: "serial_number",
   work_orders: "work_order_number",
+  technicians: "full_name",
+  contracts: "route",
 };
 
 export const modules = {
