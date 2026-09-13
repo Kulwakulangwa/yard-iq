@@ -9,8 +9,8 @@ export const db = supabase as never as {
   from: (table: string) => any;
 };
 
-export async function selectAll(table: string, columns = "*"): Promise<Record<string, any>[]> {
+export async function selectAll(table: string, columns = "*"): Promise<any[]> {
   const { data, error } = await db.from(table).select(columns);
   if (error) throw error;
-  return (data ?? []) as Record<string, any>[];
+  return (data ?? []) as any[];
 }
