@@ -24,6 +24,7 @@ import { Route as AuthenticatedYardRouteImport } from './routes/_authenticated/y
 import { Route as AuthenticatedZonesRouteImport } from './routes/_authenticated/zones'
 import { Route as AuthenticatedMSlugRouteImport } from './routes/_authenticated/m.$slug'
 import { Route as AuthenticatedVehiclesIndexRouteImport } from './routes/_authenticated/vehicles.index'
+import { Route as AuthenticatedVehiclesVehicleIdRouteImport } from './routes/_authenticated/vehicles.$vehicleId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -102,6 +103,12 @@ const AuthenticatedVehiclesIndexRoute =
     path: '/vehicles/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedVehiclesVehicleIdRoute =
+  AuthenticatedVehiclesVehicleIdRouteImport.update({
+    id: '/vehicles/$vehicleId',
+    path: '/vehicles/$vehicleId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/m/$slug': typeof AuthenticatedMSlugRoute
+  '/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
   '/vehicles/': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -133,6 +141,7 @@ export interface FileRoutesByTo {
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/m/$slug': typeof AuthenticatedMSlugRoute
+  '/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
   '/vehicles': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRoutesById {
@@ -151,6 +160,7 @@ export interface FileRoutesById {
   '/_authenticated/yard': typeof AuthenticatedYardRoute
   '/_authenticated/zones': typeof AuthenticatedZonesRoute
   '/_authenticated/m/$slug': typeof AuthenticatedMSlugRoute
+  '/_authenticated/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
   '/_authenticated/vehicles/': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRouteTypes {
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/yard'
     | '/zones'
     | '/m/$slug'
+    | '/vehicles/$vehicleId'
     | '/vehicles/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/yard'
     | '/zones'
     | '/m/$slug'
+    | '/vehicles/$vehicleId'
     | '/vehicles'
   id:
     | '__root__'
@@ -202,6 +214,7 @@ export interface FileRouteTypes {
     | '/_authenticated/yard'
     | '/_authenticated/zones'
     | '/_authenticated/m/$slug'
+    | '/_authenticated/vehicles/$vehicleId'
     | '/_authenticated/vehicles/'
   fileRoutesById: FileRoutesById
 }
@@ -318,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVehiclesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/vehicles/$vehicleId': {
+      id: '/_authenticated/vehicles/$vehicleId'
+      path: '/vehicles/$vehicleId'
+      fullPath: '/vehicles/$vehicleId'
+      preLoaderRoute: typeof AuthenticatedVehiclesVehicleIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -333,6 +353,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedYardRoute: typeof AuthenticatedYardRoute
   AuthenticatedZonesRoute: typeof AuthenticatedZonesRoute
   AuthenticatedMSlugRoute: typeof AuthenticatedMSlugRoute
+  AuthenticatedVehiclesVehicleIdRoute: typeof AuthenticatedVehiclesVehicleIdRoute
   AuthenticatedVehiclesIndexRoute: typeof AuthenticatedVehiclesIndexRoute
 }
 
@@ -348,6 +369,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedYardRoute: AuthenticatedYardRoute,
   AuthenticatedZonesRoute: AuthenticatedZonesRoute,
   AuthenticatedMSlugRoute: AuthenticatedMSlugRoute,
+  AuthenticatedVehiclesVehicleIdRoute: AuthenticatedVehiclesVehicleIdRoute,
   AuthenticatedVehiclesIndexRoute: AuthenticatedVehiclesIndexRoute,
 }
 
