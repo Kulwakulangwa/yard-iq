@@ -123,7 +123,7 @@ export const modules = {
   trips: {
     table: "trips",
     title: "Trips",
-    subtitle: "Planned journeys created by the office",
+    subtitle: "Border journeys, contracts and settlement",
     prefix: "TRP",
     prefixKey: "trip_number",
     columns: ["trip_number", "customer_id", "origin", "destination", "planned_departure", "vehicle_id", "driver_id", "status"],
@@ -142,7 +142,7 @@ export const modules = {
       {
         key: "status",
         type: "select",
-        options: ["Draft", "Approved", "Ready for Yard", "In Yard", "Dispatched", "Delivered", "Closed", "Cancelled"],
+        options: ["Draft", "Approved", "Ready for Yard", "In Yard", "Dispatched", "In Transit", "At Border", "Delivered", "Pending Settlement", "Completed", "Closed", "Cancelled"],
       },
       { key: "planned_distance", type: "number" },
       { key: "notes", type: "textarea" },
