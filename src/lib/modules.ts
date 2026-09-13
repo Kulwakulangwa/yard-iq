@@ -17,7 +17,16 @@ export type Field = {
   readOnly?: boolean;
 };
 
-export type RefTable = "customers" | "vehicles" | "drivers" | "trips" | "loads" | "tires" | "work_orders";
+export type RefTable =
+  | "customers"
+  | "vehicles"
+  | "drivers"
+  | "trips"
+  | "loads"
+  | "tires"
+  | "work_orders"
+  | "technicians"
+  | "contracts";
 
 export type ModuleConfig = {
   table: string;
@@ -40,6 +49,8 @@ export const REF_LABEL: Record<RefTable, string> = {
   loads: "load_reference",
   tires: "serial_number",
   work_orders: "work_order_number",
+  technicians: "full_name",
+  contracts: "route",
 };
 
 export const modules = {
@@ -103,6 +114,8 @@ export const modules = {
       { key: "licence_number" },
       { key: "licence_expiry", type: "date" },
       { key: "assigned_vehicle" },
+      { key: "monthly_salary_tzs", label: "Monthly salary (TZS)", type: "number" },
+      { key: "base_location" },
       { key: "status", type: "select", options: ["Available", "On Trip", "Suspended", "Off Duty"] },
       { key: "notes", type: "textarea" },
     ],
@@ -217,12 +230,14 @@ export const modules = {
     table: "technicians",
     title: "Technicians",
     subtitle: "Workshop staff",
-    columns: ["full_name", "phone", "speciality", "status"],
+    columns: ["full_name", "phone", "email", "speciality", "status"],
     statusKey: "status",
-    searchKeys: ["full_name", "speciality"],
+    searchKeys: ["full_name", "speciality", "email", "phone"],
     fields: [
       { key: "full_name" },
       { key: "phone" },
+      { key: "email" },
+      { key: "address" },
       { key: "speciality" },
       { key: "status", type: "select", options: ["Active", "Inactive"] },
     ],
@@ -245,6 +260,7 @@ export const modules = {
         options: ["Trip", "Fuel", "Maintenance", "Yard", "Administrative", "Emergency", "Other"],
       },
       { key: "amount", type: "number" },
+      { key: "volume_liters", label: "Volume (litres)", type: "number" },
       { key: "currency" },
       { key: "supplier" },
       { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
@@ -400,6 +416,79 @@ export const modules = {
       { key: "reported_on", type: "date" },
       { key: "follow_up_notes", type: "textarea" },
       { key: "case_status", type: "select", options: ["Open", "Under Investigation", "Closed"] },
+    ],
+  },
+  contracts: {
+    table: "contracts",
+    title: "Contracts",
+    subtitle: "Border freight contracts priced in USD",
+    columns: ["route", "customer_id", "contract_currency", "contract_amount", "start_date", "end_date", "status"],
+    statusKey: "status",
+    searchKeys: ["route", "status"],
+    fields: [
+      { key: "customer_id", label: "Customer", type: "ref", refTable: "customers" },
+      { key: "route" },
+      { key: "contract_currency", type: "select", options: ["USD", "TZS"] },
+      { key: "contract_amount", type: "number" },
+      { key: "start_date", type: "date" },
+      { key: "end_date", type: "date" },
+      { key: "status", type: "select", options: ["Active", "Expired", "Terminated"] },
+      { key: "notes", type: "textarea" },
+    ],
+  },
+  vehicle_maintenance: {
+    table: "vehicle_maintenance",
+    title: "Maintenance",
+    subtitle: "Workshop jobs with cost, technician and payment balance",
+    columns: ["maintenance_date", "vehicle_id", "description", "technician_id", "cost_tzs", "paid_amount", "status"],
+    statusKey: "status",
+    searchKeys: ["description", "status"],
+    fields: [
+      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles" },
+      { key: "maintenance_date", type: "date" },
+      { key: "description", type: "textarea" },
+      { key: "cost_tzs", label: "Cost (TZS)", type: "number" },
+      { key: "duration_hours", type: "number" },
+      { key: "status", type: "select", options: ["Planned", "In-Progress", "Completed"] },
+      { key: "technician_id", label: "Technician", type: "ref", refTable: "technicians" },
+      { key: "paid_amount", label: "Paid amount (TZS)", type: "number" },
+    ],
+  },
+  driver_payments: {
+    table: "driver_payments",
+    title: "Driver Payments",
+    subtitle: "Salary, advance and bonus ledger",
+    columns: ["payment_date", "driver_id", "payment_type", "amount_tzs", "period_label", "reference_trip"],
+    statusKey: "payment_type",
+    searchKeys: ["period_label", "notes", "payment_type"],
+    fields: [
+      { key: "driver_id", label: "Driver", type: "ref", refTable: "drivers" },
+      { key: "payment_type", type: "select", options: ["Salary", "Advance", "Bonus"] },
+      { key: "amount_tzs", label: "Amount (TZS)", type: "number" },
+      { key: "payment_date", type: "date" },
+      { key: "period_label", label: "Period (e.g. Sep 2026)" },
+      { key: "reference_trip", label: "Trip", type: "ref", refTable: "trips" },
+      { key: "notes", type: "textarea" },
+    ],
+  },
+  operational_expenses: {
+    table: "operational_expenses",
+    title: "Operational Expenses",
+    subtitle: "Non-trip costs such as rent, loans, utilities and insurance",
+    columns: ["expense_date", "description", "category", "amount_tzs", "receipt_url"],
+    statusKey: "category",
+    searchKeys: ["description", "category"],
+    fields: [
+      { key: "description" },
+      {
+        key: "category",
+        type: "select",
+        options: ["Rent", "Loan Repayment", "Stationery", "Utilities", "Insurance", "Other"],
+      },
+      { key: "amount_tzs", label: "Amount (TZS)", type: "number" },
+      { key: "expense_date", type: "date" },
+      { key: "receipt_url", label: "Receipt link" },
+      { key: "notes", type: "textarea" },
     ],
   },
   yard_zones: {
