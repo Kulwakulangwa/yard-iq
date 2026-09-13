@@ -18,10 +18,13 @@ import { Route as AuthenticatedGateRouteImport } from './routes/_authenticated/g
 import { Route as AuthenticatedMaintenanceHandoverRouteImport } from './routes/_authenticated/maintenance-handover'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedTechniciansRouteImport } from './routes/_authenticated/technicians'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedVerificationRouteImport } from './routes/_authenticated/verification'
 import { Route as AuthenticatedYardRouteImport } from './routes/_authenticated/yard'
 import { Route as AuthenticatedZonesRouteImport } from './routes/_authenticated/zones'
+import { Route as AuthenticatedDriversIndexRouteImport } from './routes/_authenticated/drivers.index'
+import { Route as AuthenticatedDriversDriverIdRouteImport } from './routes/_authenticated/drivers.$driverId'
 import { Route as AuthenticatedMSlugRouteImport } from './routes/_authenticated/m.$slug'
 import { Route as AuthenticatedVehiclesIndexRouteImport } from './routes/_authenticated/vehicles.index'
 import { Route as AuthenticatedVehiclesVehicleIdRouteImport } from './routes/_authenticated/vehicles.$vehicleId'
@@ -71,6 +74,12 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTechniciansRoute =
+  AuthenticatedTechniciansRouteImport.update({
+    id: '/technicians',
+    path: '/technicians',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -92,6 +101,18 @@ const AuthenticatedZonesRoute = AuthenticatedZonesRouteImport.update({
   path: '/zones',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDriversIndexRoute =
+  AuthenticatedDriversIndexRouteImport.update({
+    id: '/drivers/',
+    path: '/drivers/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDriversDriverIdRoute =
+  AuthenticatedDriversDriverIdRouteImport.update({
+    id: '/drivers/$driverId',
+    path: '/drivers/$driverId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMSlugRoute = AuthenticatedMSlugRouteImport.update({
   id: '/m/$slug',
   path: '/m/$slug',
@@ -119,12 +140,15 @@ export interface FileRoutesByFullPath {
   '/maintenance-handover': typeof AuthenticatedMaintenanceHandoverRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/technicians': typeof AuthenticatedTechniciansRoute
   '/users': typeof AuthenticatedUsersRoute
   '/verification': typeof AuthenticatedVerificationRoute
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
+  '/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
   '/m/$slug': typeof AuthenticatedMSlugRoute
   '/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
+  '/drivers/': typeof AuthenticatedDriversIndexRoute
   '/vehicles/': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -136,12 +160,15 @@ export interface FileRoutesByTo {
   '/maintenance-handover': typeof AuthenticatedMaintenanceHandoverRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/technicians': typeof AuthenticatedTechniciansRoute
   '/users': typeof AuthenticatedUsersRoute
   '/verification': typeof AuthenticatedVerificationRoute
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
+  '/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
   '/m/$slug': typeof AuthenticatedMSlugRoute
   '/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
+  '/drivers': typeof AuthenticatedDriversIndexRoute
   '/vehicles': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRoutesById {
@@ -155,12 +182,15 @@ export interface FileRoutesById {
   '/_authenticated/maintenance-handover': typeof AuthenticatedMaintenanceHandoverRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/technicians': typeof AuthenticatedTechniciansRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/verification': typeof AuthenticatedVerificationRoute
   '/_authenticated/yard': typeof AuthenticatedYardRoute
   '/_authenticated/zones': typeof AuthenticatedZonesRoute
+  '/_authenticated/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
   '/_authenticated/m/$slug': typeof AuthenticatedMSlugRoute
   '/_authenticated/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
+  '/_authenticated/drivers/': typeof AuthenticatedDriversIndexRoute
   '/_authenticated/vehicles/': typeof AuthenticatedVehiclesIndexRoute
 }
 export interface FileRouteTypes {
@@ -174,12 +204,15 @@ export interface FileRouteTypes {
     | '/maintenance-handover'
     | '/reports'
     | '/settings'
+    | '/technicians'
     | '/users'
     | '/verification'
     | '/yard'
     | '/zones'
+    | '/drivers/$driverId'
     | '/m/$slug'
     | '/vehicles/$vehicleId'
+    | '/drivers/'
     | '/vehicles/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -191,12 +224,15 @@ export interface FileRouteTypes {
     | '/maintenance-handover'
     | '/reports'
     | '/settings'
+    | '/technicians'
     | '/users'
     | '/verification'
     | '/yard'
     | '/zones'
+    | '/drivers/$driverId'
     | '/m/$slug'
     | '/vehicles/$vehicleId'
+    | '/drivers'
     | '/vehicles'
   id:
     | '__root__'
@@ -209,12 +245,15 @@ export interface FileRouteTypes {
     | '/_authenticated/maintenance-handover'
     | '/_authenticated/reports'
     | '/_authenticated/settings'
+    | '/_authenticated/technicians'
     | '/_authenticated/users'
     | '/_authenticated/verification'
     | '/_authenticated/yard'
     | '/_authenticated/zones'
+    | '/_authenticated/drivers/$driverId'
     | '/_authenticated/m/$slug'
     | '/_authenticated/vehicles/$vehicleId'
+    | '/_authenticated/drivers/'
     | '/_authenticated/vehicles/'
   fileRoutesById: FileRoutesById
 }
@@ -289,6 +328,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/technicians': {
+      id: '/_authenticated/technicians'
+      path: '/technicians'
+      fullPath: '/technicians'
+      preLoaderRoute: typeof AuthenticatedTechniciansRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/users': {
       id: '/_authenticated/users'
       path: '/users'
@@ -315,6 +361,20 @@ declare module '@tanstack/react-router' {
       path: '/zones'
       fullPath: '/zones'
       preLoaderRoute: typeof AuthenticatedZonesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/drivers/': {
+      id: '/_authenticated/drivers/'
+      path: '/drivers'
+      fullPath: '/drivers/'
+      preLoaderRoute: typeof AuthenticatedDriversIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/drivers/$driverId': {
+      id: '/_authenticated/drivers/$driverId'
+      path: '/drivers/$driverId'
+      fullPath: '/drivers/$driverId'
+      preLoaderRoute: typeof AuthenticatedDriversDriverIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/m/$slug': {
@@ -348,12 +408,15 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMaintenanceHandoverRoute: typeof AuthenticatedMaintenanceHandoverRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTechniciansRoute: typeof AuthenticatedTechniciansRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedVerificationRoute: typeof AuthenticatedVerificationRoute
   AuthenticatedYardRoute: typeof AuthenticatedYardRoute
   AuthenticatedZonesRoute: typeof AuthenticatedZonesRoute
+  AuthenticatedDriversDriverIdRoute: typeof AuthenticatedDriversDriverIdRoute
   AuthenticatedMSlugRoute: typeof AuthenticatedMSlugRoute
   AuthenticatedVehiclesVehicleIdRoute: typeof AuthenticatedVehiclesVehicleIdRoute
+  AuthenticatedDriversIndexRoute: typeof AuthenticatedDriversIndexRoute
   AuthenticatedVehiclesIndexRoute: typeof AuthenticatedVehiclesIndexRoute
 }
 
@@ -364,12 +427,15 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMaintenanceHandoverRoute: AuthenticatedMaintenanceHandoverRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTechniciansRoute: AuthenticatedTechniciansRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedVerificationRoute: AuthenticatedVerificationRoute,
   AuthenticatedYardRoute: AuthenticatedYardRoute,
   AuthenticatedZonesRoute: AuthenticatedZonesRoute,
+  AuthenticatedDriversDriverIdRoute: AuthenticatedDriversDriverIdRoute,
   AuthenticatedMSlugRoute: AuthenticatedMSlugRoute,
   AuthenticatedVehiclesVehicleIdRoute: AuthenticatedVehiclesVehicleIdRoute,
+  AuthenticatedDriversIndexRoute: AuthenticatedDriversIndexRoute,
   AuthenticatedVehiclesIndexRoute: AuthenticatedVehiclesIndexRoute,
 }
 
