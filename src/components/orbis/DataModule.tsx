@@ -22,6 +22,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "./AppShell";
 import { StatusBadge } from "./StatusBadge";
+import { TripFinance } from "./TripFinance";
 
 type Row = Record<string, unknown>;
 const db = supabase as never as {
@@ -279,6 +280,7 @@ export function DataModule({
               );
             })}
           </div>
+          {config.table === "trips" && editingId ? <TripFinance tripId={editingId} /> : config.table === "trips" ? <p className="text-sm text-muted-foreground">Save the trip before adding its finances.</p> : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
