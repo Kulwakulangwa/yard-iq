@@ -1397,12 +1397,146 @@ export type Database = {
           },
         ]
       }
+      trip_locations: {
+        Row: {
+          checkpoint: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          location: string
+          notes: string | null
+          reported_at: string
+          reported_by: string | null
+          trip_id: string
+          trip_vehicle_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          checkpoint?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location: string
+          notes?: string | null
+          reported_at?: string
+          reported_by?: string | null
+          trip_id: string
+          trip_vehicle_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          checkpoint?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location?: string
+          notes?: string | null
+          reported_at?: string
+          reported_by?: string | null
+          trip_id?: string
+          trip_vehicle_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_locations_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_locations_trip_vehicle_id_fkey"
+            columns: ["trip_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "trip_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_vehicles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          id: string
+          notes: string | null
+          role: string
+          trailer_id: string | null
+          trip_id: string
+          updated_at: string
+          updated_by: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          role?: string
+          trailer_id?: string | null
+          trip_id: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          role?: string
+          trailer_id?: string | null
+          trip_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_vehicles_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_vehicles_trailer_id_fkey"
+            columns: ["trailer_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_vehicles_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_vehicles_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trips: {
         Row: {
           audited_at: string | null
           contract_id: string | null
           created_at: string
           created_by: string | null
+          current_location: string | null
+          current_location_at: string | null
+          current_location_by: string | null
           customer_id: string | null
           destination: string | null
           driver_id: string | null
@@ -1426,6 +1560,9 @@ export type Database = {
           contract_id?: string | null
           created_at?: string
           created_by?: string | null
+          current_location?: string | null
+          current_location_at?: string | null
+          current_location_by?: string | null
           customer_id?: string | null
           destination?: string | null
           driver_id?: string | null
@@ -1449,6 +1586,9 @@ export type Database = {
           contract_id?: string | null
           created_at?: string
           created_by?: string | null
+          current_location?: string | null
+          current_location_at?: string | null
+          current_location_by?: string | null
           customer_id?: string | null
           destination?: string | null
           driver_id?: string | null
