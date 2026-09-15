@@ -96,11 +96,11 @@ function VehiclesPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7}>Loading…</TableCell>
+                  <TableCell colSpan={8}>Loading…</TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>No vehicles yet.</TableCell>
+                  <TableCell colSpan={8}>No vehicles yet.</TableCell>
                 </TableRow>
               ) : (
                 filtered.map((v) => (
