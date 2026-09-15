@@ -44,7 +44,7 @@ function FinancePage() {
 
   if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading finance summary…</p>;
 
-  const revenueDual = dual(data.revenue);
+  const revenueDual = dual(data.revenue, fx);
   const vat = vatBreakdown(data.revenue);
 
   return (

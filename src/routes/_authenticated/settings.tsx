@@ -19,6 +19,7 @@ const db = supabase as never as { from: (t: string) => any };
 const SETTING_KEYS = [
   { key: "company_name", label: "Company name", type: "text" },
   { key: "default_currency", label: "Default currency", type: "text" },
+  { key: "usd_tzs_rate", label: "USD to TZS exchange rate", type: "number" },
   { key: "fuel_variance_tolerance_percent", label: "Fuel variance tolerance (%)", type: "number" },
   { key: "auto_approve_low_variance", label: "Auto-approve low variance", type: "boolean" },
   { key: "require_gate_photo", label: "Require gate photo", type: "boolean" },
