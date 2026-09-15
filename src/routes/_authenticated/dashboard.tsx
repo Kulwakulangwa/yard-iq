@@ -143,8 +143,8 @@ function Dashboard() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat label="Contract revenue" value={tzs(revenueTzs)} hint={usd(revenueTzs / DEFAULT_FX)} />
-            <Stat label="Cash disbursed" value={tzs(cashDisbursed)} hint={usd(cashDisbursed / DEFAULT_FX)} />
+            <Stat label="Contract revenue" value={tzs(revenueTzs)} hint={usd(revenueTzs / fx)} />
+            <Stat label="Cash disbursed" value={tzs(cashDisbursed)} hint={usd(cashDisbursed / fx)} />
             <Stat label="Outstanding from customers" value={tzs(outstanding)} tone={outstanding > 0 ? "amber" : "default"} />
             <Stat label="Fuel approved" value={`${litres.toLocaleString()} L`} hint={tzs(fuelCost)} />
             <Stat label="Active trips" value={activeTrips} />
@@ -208,7 +208,7 @@ function Dashboard() {
                               <span>
                                 {tzs(f.total_contract_tzs)}
                                 <span className="block text-xs text-muted-foreground">
-                                  {usd(f.contract_currency === "USD" ? f.contract_amount : Number(f.total_contract_tzs ?? 0) / DEFAULT_FX)}
+                                  {usd(f.contract_currency === "USD" ? f.contract_amount : Number(f.total_contract_tzs ?? 0) / fx)}
                                 </span>
                               </span>
                             ) : (
