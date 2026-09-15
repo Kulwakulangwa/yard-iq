@@ -183,6 +183,7 @@ function Dashboard() {
                     <th className="py-2 pr-3">Route</th>
                     <th className="py-2 pr-3">Driver</th>
                     <th className="py-2 pr-3">Contract value</th>
+                    <th className="py-2 pr-3">Current location</th>
                     <th className="py-2 pr-3">Status</th>
                   </tr>
                 </thead>
@@ -214,6 +215,16 @@ function Dashboard() {
                               </span>
                             ) : (
                               <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {t.current_location ? (
+                              <span>
+                                {t.current_location}
+                                <span className="block text-xs text-muted-foreground">{timeAgo(t.current_location_at)}</span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">Not reported</span>
                             )}
                           </td>
                           <td className="py-2 pr-3">
