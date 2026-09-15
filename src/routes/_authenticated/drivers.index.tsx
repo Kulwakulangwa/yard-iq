@@ -49,6 +49,8 @@ function DriversPage() {
     },
   });
 
+  const editor = useRecordEditor(modules.drivers, rows);
+
   const filtered = rows.filter((r: any) =>
     `${r.full_name ?? ""} ${r.driver_code ?? ""} ${r.phone ?? ""}`.toLowerCase().includes(term.trim().toLowerCase()),
   );
@@ -56,6 +58,10 @@ function DriversPage() {
   return (
     <>
       <PageHeader title="Drivers" subtitle="Driver register, trip load and payments" />
+      <div className="mb-4">
+        <Button onClick={editor.openNew}>New driver</Button>
+      </div>
+      {editor.dialog}
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Total drivers" value={rows.length} />
         <Stat label="On trip" value={rows.filter((r: any) => r.status === "On Trip").length} />
