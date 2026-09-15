@@ -21,6 +21,7 @@ export const Route = createFileRoute("/_authenticated/finance")({
 });
 
 function FinancePage() {
+  const fx = useFxRate();
   const { data, isLoading } = useQuery({
     queryKey: ["finance-summary"],
     queryFn: async () => {
