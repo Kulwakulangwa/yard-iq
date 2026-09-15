@@ -41,9 +41,15 @@ function TechniciansPage() {
     },
   });
 
+  const editor = useRecordEditor(modules.technicians, rows);
+
   return (
     <>
       <PageHeader title="Technicians" subtitle="Workshop staff, jobs completed and payment balances" />
+      <div className="mb-4">
+        <Button onClick={editor.openNew}>New technician</Button>
+      </div>
+      {editor.dialog}
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Technicians" value={rows.length} />
         <Stat label="Total billed" value={tzs(sum(rows, (r: any) => r.billed))} />
