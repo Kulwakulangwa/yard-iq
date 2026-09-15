@@ -90,6 +90,7 @@ function VehiclesPage() {
                 <TableHead>Active / total trips</TableHead>
                 <TableHead>Total KM</TableHead>
                 <TableHead>Revenue booked</TableHead>
+                <TableHead className="text-right">Edit</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -123,6 +124,11 @@ function VehiclesPage() {
                     </TableCell>
                     <TableCell>{v.km.toLocaleString()}</TableCell>
                     <TableCell className="whitespace-nowrap">{tzs(v.revenue)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => editor.openEdit(v)}>
+                        Edit
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
