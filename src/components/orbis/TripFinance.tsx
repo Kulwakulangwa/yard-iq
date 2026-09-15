@@ -4,12 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DEFAULT_FX, advanceAmount, tzs, usd } from "@/lib/money";
+import { advanceAmount, tzs, usd } from "@/lib/money";
+import { useFxRate } from "@/lib/fx";
 import { toast } from "sonner";
 
 type Finance = { contract_amount: number; fx_exchange_rate: number; advance_input_type: string; advance_value: number; advance_paid_tzs: number; advance_paid_usd: number; customer_paid_tzs: number };
-const defaults: Finance = { contract_amount: 0, fx_exchange_rate: DEFAULT_FX, advance_input_type: "percentage", advance_value: 0, advance_paid_tzs: 0, advance_paid_usd: 0, customer_paid_tzs: 0 };
 export function TripFinance({ tripId }: { tripId: string }) {
+  const fx = useFxRate();
+  const defaults: Finance = { contract_amount: 0, fx_exchange_rate: fx, advance_input_type: "percentage", advance_value: 0, advance_paid_tzs: 0, advance_paid_usd: 0, customer_paid_tzs: 0 };
   const query = useQuery({ queryKey: ["trip-finance", tripId], queryFn: async () => {
     const { data, error } = await supabase.from("trip_financials").select("*").eq("trip_id", tripId).maybeSingle();
     if (error) throw error;

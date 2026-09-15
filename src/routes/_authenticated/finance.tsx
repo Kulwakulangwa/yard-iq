@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { selectAll } from "@/lib/db";
 import { dual, sum, tzs, vatBreakdown } from "@/lib/money";
+import { useFxRate } from "@/lib/fx";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { Stat } from "@/components/orbis/Stat";
