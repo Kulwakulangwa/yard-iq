@@ -90,6 +90,17 @@ export function Stat({
   );
 }
 
+function timeAgo(value: unknown) {
+  if (!value) return "time not recorded";
+  const then = new Date(String(value)).getTime();
+  if (!Number.isFinite(then)) return "time not recorded";
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} days ago`;
+}
+
 const IN_TRANSIT = ["Dispatched", "In Transit", "In Yard", "At Border"];
 const DONE = ["Completed", "Delivered", "Closed"];
 
