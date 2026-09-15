@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { StatusBadge } from "@/components/orbis/StatusBadge";
-import { tzs, usd, DEFAULT_FX, sum } from "@/lib/money";
+import { tzs, usd, sum } from "@/lib/money";
+import { useFxRate } from "@/lib/fx";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
