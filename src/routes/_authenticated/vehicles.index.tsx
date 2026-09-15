@@ -62,6 +62,10 @@ function VehiclesPage() {
   return (
     <>
       <PageHeader title="Vehicles" subtitle="Fleet inventory, utilisation and revenue booked" />
+      <div className="mb-4">
+        <Button onClick={editor.openNew}>New vehicle</Button>
+      </div>
+      {editor.dialog}
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Total vehicles" value={rows.length} />
         <Stat label="Currently on trips" value={rows.filter((r) => r.activeCount > 0).length} />
