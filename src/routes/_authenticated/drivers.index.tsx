@@ -88,6 +88,7 @@ function DriversPage() {
                 <TableHead>Salary</TableHead>
                 <TableHead>Paid to date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Edit</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -120,6 +121,11 @@ function DriversPage() {
                     <TableCell className="whitespace-nowrap">{tzs(d.paid)}</TableCell>
                     <TableCell>
                       <StatusBadge value={d.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => editor.openEdit(d)}>
+                        Edit
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
