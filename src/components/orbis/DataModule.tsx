@@ -1,33 +1,30 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Plus } from "lucide-react";
+import { Download, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 
-import { supabase } from "@/integrations/supabase/client";
-import { REF_LABEL, type Field, type ModuleConfig, type RefTable } from "@/lib/modules";
-import { exportCsv, formatValue, humanize, logAudit, nextReference } from "@/lib/orbis";
+import { db } from "@/lib/db";
+import { type ModuleConfig } from "@/lib/modules";
+import { exportCsv, formatValue, humanize, logAudit } from "@/lib/orbis";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "./AppShell";
 import { StatusBadge } from "./StatusBadge";
-import { TripFinance } from "./TripFinance";
+import { ModuleStats } from "./ModuleStats";
+import { ConvoyLegRows, useConvoyLegs } from "./ConvoyRows";
+import { useRecordEditor } from "./RecordEditor";
 
 type Row = Record<string, unknown>;
-const db = supabase as never as {
-  from: (t: string) => any;
-};
 
 export function useRows(table: string) {
   return useQuery({
@@ -36,25 +33,6 @@ export function useRows(table: string) {
       const { data, error } = await db.from(table).select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Row[];
-    },
-  });
-}
-
-function useRefOptions(fields: Field[]) {
-  const tables = [...new Set(fields.filter((f) => f.refTable).map((f) => f.refTable as RefTable))];
-  return useQuery({
-    queryKey: ["refs", tables.join(",")],
-    enabled: tables.length > 0,
-    queryFn: async () => {
-      const out: Partial<Record<RefTable, { id: string; label: string }[]>> = {};
-      for (const t of tables) {
-        const { data } = await db.from(t).select(`id, ${REF_LABEL[t]}`).limit(500);
-        out[t] = ((data ?? []) as Row[]).map((r) => ({
-          id: String(r["id"]),
-          label: String(r[REF_LABEL[t]] ?? r["id"]),
-        }));
-      }
-      return out;
     },
   });
 }
@@ -68,64 +46,54 @@ export function DataModule({
 }) {
   const qc = useQueryClient();
   const { data: rows = [], isLoading } = useRows(config.table);
-  const { data: refs = {} } = useRefOptions(config.fields);
+  const { dialog, openNew, openEdit, refLabel } = useRecordEditor(config, rows);
   const [term, setTerm] = useState("");
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<Row>({});
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tab, setTab] = useState("All");
 
-  const refLabel = (table: RefTable | undefined, id: unknown) => {
-    if (!table || !id) return "—";
-    return refs[table]?.find((o) => o.id === String(id))?.label ?? "—";
-  };
+  const isTrips = config.table === "trips";
+  const { data: convoy } = useConvoyLegs();
 
-  const filtered = useMemo(() => {
-    const t = term.trim().toLowerCase();
-    if (!t) return rows;
-    return rows.filter((r) => config.searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(t)));
-  }, [rows, term, config.searchKeys]);
-
-  const save = useMutation({
-    mutationFn: async (payload: Row) => {
-      const body = { ...payload };
-      for (const key of Object.keys(body)) if (body[key] === "") body[key] = null;
-      if (editingId) {
-        const { error } = await db.from(config.table).update(body).eq("id", editingId);
-        if (error) throw error;
-        await logAudit("update", config.table, editingId, body);
-      } else {
-        if (config.prefix && config.prefixKey) {
-          body[config.prefixKey] = nextReference(
-            config.prefix,
-            rows.map((r) => String(r[config.prefixKey!] ?? "")),
-          );
-        }
-        const { data, error } = await db.from(config.table).insert(body).select("id").single();
-        if (error) throw error;
-        await logAudit("create", config.table, data?.id, body);
-      }
+  const setStatus = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: string }) => {
+      const { error } = await db
+        .from(config.table)
+        .update({ [config.statusKey as string]: value })
+        .eq("id", id);
+      if (error) throw error;
+      await logAudit("update", config.table, id, { [config.statusKey as string]: value });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [config.table] });
-      setOpen(false);
-      toast.success(editingId ? "Record updated" : "Record created");
+      qc.invalidateQueries();
+      toast.success("Status updated");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function openNew() {
-    setEditingId(null);
-    setDraft({});
-    setOpen(true);
-  }
+  const tabs = useMemo(() => {
+    if (!config.statusKey) return [];
+    const present = new Set(rows.map((r) => String(r[config.statusKey!] ?? "")).filter(Boolean));
+    const ordered = (config.statusOptions ?? []).filter((o) => present.has(o));
+    const extras = [...present].filter((p) => !ordered.includes(p));
+    const values = ordered.length > 0 ? [...ordered, ...extras] : [...present];
+    return values.map((v) => ({
+      value: v,
+      count: rows.filter((r) => String(r[config.statusKey!] ?? "") === v).length,
+    }));
+  }, [rows, config.statusKey, config.statusOptions]);
 
-  function openEdit(row: Row) {
-    setEditingId(String(row["id"]));
-    const d: Row = {};
-    for (const f of config.fields) d[f.key] = row[f.key] ?? "";
-    setDraft(d);
-    setOpen(true);
-  }
+  const filtered = useMemo(() => {
+    const t = term.trim().toLowerCase();
+    let list = rows;
+    if (tab !== "All" && config.statusKey) {
+      list = list.filter((r) => String(r[config.statusKey!] ?? "") === tab);
+    }
+    if (t) {
+      list = list.filter((r) => config.searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(t)));
+    }
+    return list;
+  }, [rows, term, tab, config.searchKeys, config.statusKey]);
+
+  const colSpan = config.columns.length + 1;
 
   return (
     <>
@@ -145,19 +113,39 @@ export function DataModule({
       />
 
       {readOnlyNotice ? (
-        <p className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-          {readOnlyNotice}
-        </p>
+        <p className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{readOnlyNotice}</p>
       ) : null}
 
-      <Card className="p-3 sm:p-4">
-        <Input
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          placeholder={`Search ${config.title.toLowerCase()}…`}
-          className="mb-3 sm:max-w-sm"
-        />
-        <div className="overflow-x-auto">
+      <ModuleStats table={config.table} rows={rows} />
+
+      <Card className="w-full p-3 sm:p-4">
+        <div className="mb-3 grid grid-cols-[minmax(0,1fr)] gap-3 lg:flex lg:items-center lg:justify-between">
+          <Input
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder={`Search ${config.title.toLowerCase()}…`}
+            className="min-w-0 lg:max-w-sm"
+          />
+          {tabs.length > 0 ? (
+            <div className="-mx-1 flex gap-1 overflow-x-auto px-1">
+              {[{ value: "All", count: rows.length }, ...tabs].map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setTab(t.value)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-sm transition-colors ${
+                    tab === t.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {t.value === "All" ? "All" : humanize(t.value)}
+                  <span className="ml-1.5 text-xs opacity-70">{t.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="w-full overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -166,131 +154,85 @@ export function DataModule({
                     {humanize(c)}
                   </TableHead>
                 ))}
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={config.columns.length}>Loading…</TableCell>
+                  <TableCell colSpan={colSpan}>Loading…</TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={config.columns.length}>No records yet.</TableCell>
+                  <TableCell colSpan={colSpan}>No records yet.</TableCell>
                 </TableRow>
               ) : (
-                filtered.map((row) => (
-                  <TableRow
-                    key={String(row["id"])}
-                    onClick={() => openEdit(row)}
-                    className="cursor-pointer"
-                  >
-                    {config.columns.map((c) => {
-                      const field = config.fields.find((f) => f.key === c);
-                      return (
-                        <TableCell key={c} className="whitespace-nowrap">
-                          {c === config.statusKey ? (
-                            <StatusBadge value={row[c] ? String(row[c]) : null} />
-                          ) : field?.type === "ref" ? (
-                            refLabel(field.refTable, row[c])
-                          ) : (
-                            formatValue(row[c])
-                          )}
+                filtered.map((row) => {
+                  const id = String(row["id"]);
+                  const legs = isTrips ? (convoy?.get(id) ?? []) : [];
+                  return (
+                    <>
+                      <TableRow key={id} onClick={() => openEdit(row)} className="cursor-pointer">
+                        {config.columns.map((c) => {
+                          const field = config.fields.find((f) => f.key === c);
+                          return (
+                            <TableCell key={c} className="whitespace-nowrap">
+                              {c === config.statusKey ? (
+                                <StatusBadge value={row[c] ? String(row[c]) : null} />
+                              ) : field?.type === "ref" ? (
+                                refLabel(field.refTable, row[c])
+                              ) : (
+                                formatValue(row[c])
+                              )}
+                              {isTrips && c === config.columns[0] && legs.length > 1 ? (
+                                <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-primary/40 px-2 py-0.5 text-[11px] text-primary">
+                                  <Users className="size-3" /> Convoy · {legs.length}
+                                </span>
+                              ) : null}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label="Row actions">
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEdit(row)}>
+                                <Pencil className="mr-2 size-4" /> Edit
+                              </DropdownMenuItem>
+                              {config.statusKey && (config.statusOptions ?? []).length > 0 ? (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                    Move to
+                                  </DropdownMenuLabel>
+                                  {(config.statusOptions ?? [])
+                                    .filter((o) => o && o !== String(row[config.statusKey!] ?? ""))
+                                    .map((o) => (
+                                      <DropdownMenuItem key={o} onClick={() => setStatus.mutate({ id, value: o })}>
+                                        {o}
+                                      </DropdownMenuItem>
+                                    ))}
+                                </>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))
+                      </TableRow>
+                      {legs.length > 1 ? <ConvoyLegRows legs={legs} colSpan={colSpan} /> : null}
+                    </>
+                  );
+                })
               )}
             </TableBody>
           </Table>
         </div>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editingId ? "Edit" : "New"} {config.title.replace(/s$/, "")}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {config.fields.map((f) => {
-              const label = f.label ?? humanize(f.key);
-              const value = draft[f.key];
-              const set = (v: unknown) => setDraft((d) => ({ ...d, [f.key]: v }));
-              const id = `f-${f.key}`;
-              const wide = f.type === "textarea";
-              return (
-                <div key={f.key} className={wide ? "sm:col-span-2" : undefined}>
-                  <Label htmlFor={id} className="mb-1.5 block text-xs text-muted-foreground">
-                    {label}
-                  </Label>
-                  {f.type === "textarea" ? (
-                    <Textarea id={id} value={String(value ?? "")} onChange={(e) => set(e.target.value)} />
-                  ) : f.type === "boolean" ? (
-                    <Switch id={id} checked={Boolean(value)} onCheckedChange={set} />
-                  ) : f.type === "select" ? (
-                    <select
-                      id={id}
-                      value={String(value ?? "")}
-                      onChange={(e) => set(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="">—</option>
-                      {(f.options ?? []).filter(Boolean).map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                  ) : f.type === "ref" ? (
-                    <select
-                      id={id}
-                      value={String(value ?? "")}
-                      onChange={(e) => set(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="">—</option>
-                      {(refs[f.refTable as RefTable] ?? []).map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <Input
-                      id={id}
-                      type={
-                        f.type === "number"
-                          ? "number"
-                          : f.type === "date"
-                            ? "date"
-                            : f.type === "datetime"
-                              ? "datetime-local"
-                              : "text"
-                      }
-                      value={String(value ?? "").slice(0, f.type === "datetime" ? 16 : undefined)}
-                      readOnly={f.readOnly === true}
-                      onChange={(e) =>
-                        set(f.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)
-                      }
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {config.table === "trips" && editingId ? <TripFinance tripId={editingId} /> : config.table === "trips" ? <p className="text-sm text-muted-foreground">Save the trip before adding its finances.</p> : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => save.mutate(draft)} disabled={save.isPending}>
-              {save.isPending ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {dialog}
     </>
   );
 }
