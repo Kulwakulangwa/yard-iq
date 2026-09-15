@@ -1,4 +1,7 @@
 # Tasks
-- [ ] Replace public home with sign-in redirect.
-- [ ] Add trip financial editor and border status options without removing existing workflows.
-- [ ] Verify login entry and build.
+- [x] Replace public home with sign-in redirect.
+- [x] Trip financial editor and border statuses.
+- [x] Add/edit buttons on Vehicles, Drivers and Technicians.
+- [x] Bundle (convoy) trips and manual location updates with history.
+- [x] USD to TZS rate in Settings, used by dashboard, finance and trip finances.
+- [x] Latest reported location shown in the dashboard trips table.
