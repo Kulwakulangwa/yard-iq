@@ -97,6 +97,7 @@ function Dashboard() {
   const { data, isLoading } = useOffice();
   const [tab, setTab] = useState("all");
   const d = data;
+  const fx = useFxRate();
   const today = new Date().toISOString().slice(0, 10);
 
   const finByTrip = useMemo(() => {
