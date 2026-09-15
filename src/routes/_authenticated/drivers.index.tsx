@@ -4,6 +4,9 @@ import { useState } from "react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
+import { modules } from "@/lib/modules";
+import { useRecordEditor } from "@/components/orbis/RecordEditor";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
