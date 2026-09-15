@@ -4,6 +4,9 @@ import { useState } from "react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
+import { modules } from "@/lib/modules";
+import { useRecordEditor } from "@/components/orbis/RecordEditor";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -50,6 +53,7 @@ function useFleet() {
 
 function VehiclesPage() {
   const { data: rows = [], isLoading } = useFleet();
+  const editor = useRecordEditor(modules.vehicles, rows);
   const [term, setTerm] = useState("");
   const filtered = rows.filter((r) =>
     `${r.registration_number ?? ""} ${r.vehicle_type ?? ""}`.toLowerCase().includes(term.trim().toLowerCase()),
@@ -58,6 +62,10 @@ function VehiclesPage() {
   return (
     <>
       <PageHeader title="Vehicles" subtitle="Fleet inventory, utilisation and revenue booked" />
+      <div className="mb-4">
+        <Button onClick={editor.openNew}>New vehicle</Button>
+      </div>
+      {editor.dialog}
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Total vehicles" value={rows.length} />
         <Stat label="Currently on trips" value={rows.filter((r) => r.activeCount > 0).length} />
@@ -82,16 +90,17 @@ function VehiclesPage() {
                 <TableHead>Active / total trips</TableHead>
                 <TableHead>Total KM</TableHead>
                 <TableHead>Revenue booked</TableHead>
+                <TableHead className="text-right">Edit</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7}>Loading…</TableCell>
+                  <TableCell colSpan={8}>Loading…</TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>No vehicles yet.</TableCell>
+                  <TableCell colSpan={8}>No vehicles yet.</TableCell>
                 </TableRow>
               ) : (
                 filtered.map((v) => (
@@ -115,6 +124,11 @@ function VehiclesPage() {
                     </TableCell>
                     <TableCell>{v.km.toLocaleString()}</TableCell>
                     <TableCell className="whitespace-nowrap">{tzs(v.revenue)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => editor.openEdit(v)}>
+                        Edit
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}

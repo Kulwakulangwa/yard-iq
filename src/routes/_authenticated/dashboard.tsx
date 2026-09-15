@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { StatusBadge } from "@/components/orbis/StatusBadge";
-import { tzs, usd, DEFAULT_FX, sum } from "@/lib/money";
+import { tzs, usd, sum } from "@/lib/money";
+import { useFxRate } from "@/lib/fx";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -89,6 +90,17 @@ export function Stat({
   );
 }
 
+function timeAgo(value: unknown) {
+  if (!value) return "time not recorded";
+  const then = new Date(String(value)).getTime();
+  if (!Number.isFinite(then)) return "time not recorded";
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} days ago`;
+}
+
 const IN_TRANSIT = ["Dispatched", "In Transit", "In Yard", "At Border"];
 const DONE = ["Completed", "Delivered", "Closed"];
 
@@ -96,6 +108,7 @@ function Dashboard() {
   const { data, isLoading } = useOffice();
   const [tab, setTab] = useState("all");
   const d = data;
+  const fx = useFxRate();
   const today = new Date().toISOString().slice(0, 10);
 
   const finByTrip = useMemo(() => {
@@ -142,8 +155,8 @@ function Dashboard() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat label="Contract revenue" value={tzs(revenueTzs)} hint={usd(revenueTzs / DEFAULT_FX)} />
-            <Stat label="Cash disbursed" value={tzs(cashDisbursed)} hint={usd(cashDisbursed / DEFAULT_FX)} />
+            <Stat label="Contract revenue" value={tzs(revenueTzs)} hint={usd(revenueTzs / fx)} />
+            <Stat label="Cash disbursed" value={tzs(cashDisbursed)} hint={usd(cashDisbursed / fx)} />
             <Stat label="Outstanding from customers" value={tzs(outstanding)} tone={outstanding > 0 ? "amber" : "default"} />
             <Stat label="Fuel approved" value={`${litres.toLocaleString()} L`} hint={tzs(fuelCost)} />
             <Stat label="Active trips" value={activeTrips} />
@@ -181,6 +194,7 @@ function Dashboard() {
                     <th className="py-2 pr-3">Route</th>
                     <th className="py-2 pr-3">Driver</th>
                     <th className="py-2 pr-3">Contract value</th>
+                    <th className="py-2 pr-3">Current location</th>
                     <th className="py-2 pr-3">Status</th>
                   </tr>
                 </thead>
@@ -207,11 +221,21 @@ function Dashboard() {
                               <span>
                                 {tzs(f.total_contract_tzs)}
                                 <span className="block text-xs text-muted-foreground">
-                                  {usd(f.contract_currency === "USD" ? f.contract_amount : Number(f.total_contract_tzs ?? 0) / DEFAULT_FX)}
+                                  {usd(f.contract_currency === "USD" ? f.contract_amount : Number(f.total_contract_tzs ?? 0) / fx)}
                                 </span>
                               </span>
                             ) : (
                               <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {t.current_location ? (
+                              <span>
+                                {t.current_location}
+                                <span className="block text-xs text-muted-foreground">{timeAgo(t.current_location_at)}</span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">Not reported</span>
                             )}
                           </td>
                           <td className="py-2 pr-3">

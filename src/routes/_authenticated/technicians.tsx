@@ -3,6 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
+import { modules } from "@/lib/modules";
+import { useRecordEditor } from "@/components/orbis/RecordEditor";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/orbis/AppShell";
@@ -38,9 +41,15 @@ function TechniciansPage() {
     },
   });
 
+  const editor = useRecordEditor(modules.technicians, rows);
+
   return (
     <>
       <PageHeader title="Technicians" subtitle="Workshop staff, jobs completed and payment balances" />
+      <div className="mb-4">
+        <Button onClick={editor.openNew}>New technician</Button>
+      </div>
+      {editor.dialog}
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Technicians" value={rows.length} />
         <Stat label="Total billed" value={tzs(sum(rows, (r: any) => r.billed))} />
@@ -73,7 +82,7 @@ function TechniciansPage() {
                 </TableRow>
               ) : (
                 rows.map((t: any) => (
-                  <TableRow key={String(t.id)}>
+                  <TableRow key={String(t.id)} className="cursor-pointer" onClick={() => editor.openEdit(t)}>
                     <TableCell className="whitespace-nowrap font-medium">{t.full_name}</TableCell>
                     <TableCell>{t.speciality ?? "—"}</TableCell>
                     <TableCell>{t.phone ?? "—"}</TableCell>

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { selectAll } from "@/lib/db";
 import { dual, sum, tzs, vatBreakdown } from "@/lib/money";
+import { useFxRate } from "@/lib/fx";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { Stat } from "@/components/orbis/Stat";
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/_authenticated/finance")({
 });
 
 function FinancePage() {
+  const fx = useFxRate();
   const { data, isLoading } = useQuery({
     queryKey: ["finance-summary"],
     queryFn: async () => {
@@ -42,7 +44,7 @@ function FinancePage() {
 
   if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading finance summary…</p>;
 
-  const revenueDual = dual(data.revenue);
+  const revenueDual = dual(data.revenue, fx);
   const vat = vatBreakdown(data.revenue);
 
   return (

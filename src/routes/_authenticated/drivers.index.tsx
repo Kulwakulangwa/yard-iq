@@ -4,6 +4,9 @@ import { useState } from "react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
+import { modules } from "@/lib/modules";
+import { useRecordEditor } from "@/components/orbis/RecordEditor";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,6 +49,8 @@ function DriversPage() {
     },
   });
 
+  const editor = useRecordEditor(modules.drivers, rows);
+
   const filtered = rows.filter((r: any) =>
     `${r.full_name ?? ""} ${r.driver_code ?? ""} ${r.phone ?? ""}`.toLowerCase().includes(term.trim().toLowerCase()),
   );
@@ -53,6 +58,10 @@ function DriversPage() {
   return (
     <>
       <PageHeader title="Drivers" subtitle="Driver register, trip load and payments" />
+      <div className="mb-4">
+        <Button onClick={editor.openNew}>New driver</Button>
+      </div>
+      {editor.dialog}
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Total drivers" value={rows.length} />
         <Stat label="On trip" value={rows.filter((r: any) => r.status === "On Trip").length} />
@@ -79,16 +88,17 @@ function DriversPage() {
                 <TableHead>Salary</TableHead>
                 <TableHead>Paid to date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Edit</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={9}>Loading…</TableCell>
+                  <TableCell colSpan={10}>Loading…</TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9}>No drivers yet.</TableCell>
+                  <TableCell colSpan={10}>No drivers yet.</TableCell>
                 </TableRow>
               ) : (
                 filtered.map((d: any) => (
@@ -111,6 +121,11 @@ function DriversPage() {
                     <TableCell className="whitespace-nowrap">{tzs(d.paid)}</TableCell>
                     <TableCell>
                       <StatusBadge value={d.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => editor.openEdit(d)}>
+                        Edit
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
