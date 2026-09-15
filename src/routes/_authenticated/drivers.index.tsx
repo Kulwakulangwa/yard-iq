@@ -94,11 +94,11 @@ function DriversPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={9}>Loading…</TableCell>
+                  <TableCell colSpan={10}>Loading…</TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9}>No drivers yet.</TableCell>
+                  <TableCell colSpan={10}>No drivers yet.</TableCell>
                 </TableRow>
               ) : (
                 filtered.map((d: any) => (
