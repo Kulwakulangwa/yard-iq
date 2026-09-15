@@ -60,7 +60,7 @@ function Settings() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["app_settings"] });
+      qc.invalidateQueries();
       toast.success("Settings saved");
     },
     onError: (e: Error) => toast.error(e.message),
