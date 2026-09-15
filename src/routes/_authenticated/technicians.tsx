@@ -82,7 +82,7 @@ function TechniciansPage() {
                 </TableRow>
               ) : (
                 rows.map((t: any) => (
-                  <TableRow key={String(t.id)}>
+                  <TableRow key={String(t.id)} className="cursor-pointer" onClick={() => editor.openEdit(t)}>
                     <TableCell className="whitespace-nowrap font-medium">{t.full_name}</TableCell>
                     <TableCell>{t.speciality ?? "—"}</TableCell>
                     <TableCell>{t.phone ?? "—"}</TableCell>

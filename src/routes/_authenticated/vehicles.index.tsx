@@ -53,6 +53,7 @@ function useFleet() {
 
 function VehiclesPage() {
   const { data: rows = [], isLoading } = useFleet();
+  const editor = useRecordEditor(modules.vehicles, rows);
   const [term, setTerm] = useState("");
   const filtered = rows.filter((r) =>
     `${r.registration_number ?? ""} ${r.vehicle_type ?? ""}`.toLowerCase().includes(term.trim().toLowerCase()),
