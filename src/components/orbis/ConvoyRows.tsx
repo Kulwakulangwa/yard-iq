@@ -87,7 +87,7 @@ export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: n
       {legs.map((leg, i) => (
         <TableRow key={leg.id} className="bg-muted/30 hover:bg-muted/40">
           <TableCell colSpan={colSpan} className="py-2">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pl-4 sm:flex sm:flex-wrap sm:gap-6">
+            <div className="grid min-w-[660px] grid-cols-[minmax(150px,1.2fr)_minmax(120px,1fr)_minmax(140px,1fr)_minmax(220px,1.5fr)] items-center gap-4 pl-4">
               <div className="flex min-w-0 items-center gap-2">
                 <Truck className="size-4 shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm font-medium">{leg.vehicle}</span>
