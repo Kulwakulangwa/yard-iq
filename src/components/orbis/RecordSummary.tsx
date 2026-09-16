@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MapPin, Pencil, Route, Truck, UserRound } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil } from "lucide-react";
 
 import { db } from "@/lib/db";
 import { type ModuleConfig, type RefTable } from "@/lib/modules";
 import { formatValue, humanize } from "@/lib/orbis";
-import { dual, tzs, usd } from "@/lib/money";
+import { tzs, usd } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

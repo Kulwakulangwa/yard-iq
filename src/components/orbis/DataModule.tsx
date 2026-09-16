@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
+import { Download, Eye, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { db } from "@/lib/db";
-import { type ModuleConfig } from "@/lib/modules";
+import { modules, type ModuleConfig } from "@/lib/modules";
 import { exportCsv, formatValue, humanize, logAudit } from "@/lib/orbis";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ export function DataModule({
   const { dialog, openNew, openEdit, refLabel } = useRecordEditor(config, rows);
   const [term, setTerm] = useState("");
   const [tab, setTab] = useState("All");
+  const slug = Object.entries(modules).find(([, module]) => module.table === config.table)?.[0];
 
   const isTrips = config.table === "trips";
   const { data: convoy } = useConvoyLegs();
@@ -172,7 +174,7 @@ export function DataModule({
                   const legs = isTrips ? (convoy?.get(id) ?? []) : [];
                   return (
                     <>
-                      <TableRow key={id} onClick={() => openEdit(row)} className="cursor-pointer">
+                      <TableRow key={id} className="cursor-pointer">
                         {config.columns.map((c) => {
                           const field = config.fields.find((f) => f.key === c);
                           return (
@@ -200,6 +202,13 @@ export function DataModule({
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {slug ? (
+                                <DropdownMenuItem asChild>
+                                  <Link to="/m/$slug/$recordId" params={{ slug, recordId: id }}>
+                                    <Eye className="mr-2 size-4" /> View summary
+                                  </Link>
+                                </DropdownMenuItem>
+                              ) : null}
                               <DropdownMenuItem onClick={() => openEdit(row)}>
                                 <Pencil className="mr-2 size-4" /> Edit
                               </DropdownMenuItem>
