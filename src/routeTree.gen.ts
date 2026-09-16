@@ -30,6 +30,7 @@ import { Route as AuthenticatedDriversDriverIdRouteImport } from './routes/_auth
 import { Route as AuthenticatedMSlugRouteImport } from './routes/_authenticated/m.$slug'
 import { Route as AuthenticatedVehiclesIndexRouteImport } from './routes/_authenticated/vehicles.index'
 import { Route as AuthenticatedVehiclesVehicleIdRouteImport } from './routes/_authenticated/vehicles.$vehicleId'
+import { Route as AuthenticatedMSlugRecordIdRouteImport } from './routes/_authenticated/m.$slug.$recordId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -142,6 +143,12 @@ const AuthenticatedVehiclesVehicleIdRoute =
     path: '/vehicles/$vehicleId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMSlugRecordIdRoute =
+  AuthenticatedMSlugRecordIdRouteImport.update({
+    id: '/$recordId',
+    path: '/$recordId',
+    getParentRoute: () => AuthenticatedMSlugRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -160,10 +167,11 @@ export interface FileRoutesByFullPath {
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
-  '/m/$slug': typeof AuthenticatedMSlugRoute
+  '/m/$slug': typeof AuthenticatedMSlugRouteWithChildren
   '/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
   '/drivers/': typeof AuthenticatedDriversIndexRoute
   '/vehicles/': typeof AuthenticatedVehiclesIndexRoute
+  '/m/$slug/$recordId': typeof AuthenticatedMSlugRecordIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -182,10 +190,11 @@ export interface FileRoutesByTo {
   '/yard': typeof AuthenticatedYardRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
-  '/m/$slug': typeof AuthenticatedMSlugRoute
+  '/m/$slug': typeof AuthenticatedMSlugRouteWithChildren
   '/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
   '/drivers': typeof AuthenticatedDriversIndexRoute
   '/vehicles': typeof AuthenticatedVehiclesIndexRoute
+  '/m/$slug/$recordId': typeof AuthenticatedMSlugRecordIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -206,10 +215,11 @@ export interface FileRoutesById {
   '/_authenticated/yard': typeof AuthenticatedYardRoute
   '/_authenticated/zones': typeof AuthenticatedZonesRoute
   '/_authenticated/drivers/$driverId': typeof AuthenticatedDriversDriverIdRoute
-  '/_authenticated/m/$slug': typeof AuthenticatedMSlugRoute
+  '/_authenticated/m/$slug': typeof AuthenticatedMSlugRouteWithChildren
   '/_authenticated/vehicles/$vehicleId': typeof AuthenticatedVehiclesVehicleIdRoute
   '/_authenticated/drivers/': typeof AuthenticatedDriversIndexRoute
   '/_authenticated/vehicles/': typeof AuthenticatedVehiclesIndexRoute
+  '/_authenticated/m/$slug/$recordId': typeof AuthenticatedMSlugRecordIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -234,6 +244,7 @@ export interface FileRouteTypes {
     | '/vehicles/$vehicleId'
     | '/drivers/'
     | '/vehicles/'
+    | '/m/$slug/$recordId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | '/vehicles/$vehicleId'
     | '/drivers'
     | '/vehicles'
+    | '/m/$slug/$recordId'
   id:
     | '__root__'
     | '/'
@@ -279,6 +291,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vehicles/$vehicleId'
     | '/_authenticated/drivers/'
     | '/_authenticated/vehicles/'
+    | '/_authenticated/m/$slug/$recordId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -436,8 +449,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVehiclesVehicleIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/m/$slug/$recordId': {
+      id: '/_authenticated/m/$slug/$recordId'
+      path: '/$recordId'
+      fullPath: '/m/$slug/$recordId'
+      preLoaderRoute: typeof AuthenticatedMSlugRecordIdRouteImport
+      parentRoute: typeof AuthenticatedMSlugRoute
+    }
   }
 }
+
+interface AuthenticatedMSlugRouteChildren {
+  AuthenticatedMSlugRecordIdRoute: typeof AuthenticatedMSlugRecordIdRoute
+}
+
+const AuthenticatedMSlugRouteChildren: AuthenticatedMSlugRouteChildren = {
+  AuthenticatedMSlugRecordIdRoute: AuthenticatedMSlugRecordIdRoute,
+}
+
+const AuthenticatedMSlugRouteWithChildren =
+  AuthenticatedMSlugRoute._addFileChildren(AuthenticatedMSlugRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
@@ -454,7 +485,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedYardRoute: typeof AuthenticatedYardRoute
   AuthenticatedZonesRoute: typeof AuthenticatedZonesRoute
   AuthenticatedDriversDriverIdRoute: typeof AuthenticatedDriversDriverIdRoute
-  AuthenticatedMSlugRoute: typeof AuthenticatedMSlugRoute
+  AuthenticatedMSlugRoute: typeof AuthenticatedMSlugRouteWithChildren
   AuthenticatedVehiclesVehicleIdRoute: typeof AuthenticatedVehiclesVehicleIdRoute
   AuthenticatedDriversIndexRoute: typeof AuthenticatedDriversIndexRoute
   AuthenticatedVehiclesIndexRoute: typeof AuthenticatedVehiclesIndexRoute
@@ -475,7 +506,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedYardRoute: AuthenticatedYardRoute,
   AuthenticatedZonesRoute: AuthenticatedZonesRoute,
   AuthenticatedDriversDriverIdRoute: AuthenticatedDriversDriverIdRoute,
-  AuthenticatedMSlugRoute: AuthenticatedMSlugRoute,
+  AuthenticatedMSlugRoute: AuthenticatedMSlugRouteWithChildren,
   AuthenticatedVehiclesVehicleIdRoute: AuthenticatedVehiclesVehicleIdRoute,
   AuthenticatedDriversIndexRoute: AuthenticatedDriversIndexRoute,
   AuthenticatedVehiclesIndexRoute: AuthenticatedVehiclesIndexRoute,

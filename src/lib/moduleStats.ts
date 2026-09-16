@@ -116,6 +116,11 @@ export const MODULE_STATS: Record<string, StatSpec[]> = {
     { label: "Open", kind: "count", filter: { key: "case_status", in: ["Open", "Under Investigation"] }, tone: "amber" },
     { label: "Closed", kind: "count", filter: { key: "case_status", in: ["Closed"] }, tone: "green" },
   ],
+  yard_zones: [
+    { label: "Zones", kind: "count" },
+    { label: "Active zones", kind: "count", filter: { key: "active", in: ["true"] }, tone: "green" },
+    { label: "Total capacity", kind: "sum", key: "capacity" },
+  ],
   vehicles: [
     { label: "Vehicles", kind: "count" },
     { label: "On trip", kind: "count", filter: { key: "status", in: ["On Trip", "Loading"] }, tone: "amber" },
