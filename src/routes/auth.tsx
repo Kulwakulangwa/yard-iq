@@ -43,21 +43,27 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     setErrorMsg(null);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
-          email,
-          password,
+          email: cleanEmail,
+          password: cleanPassword,
           options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
         toast.success("Account created. You can sign in now.");
         setMode("signin");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: cleanPassword,
+        });
         if (error) throw error;
         navigate({ to: "/dashboard", replace: true });
       }
+
     } catch (err) {
       const message = (err as Error).message;
       setErrorMsg(message);
