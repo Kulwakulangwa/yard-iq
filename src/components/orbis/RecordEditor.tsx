@@ -81,9 +81,9 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function openNew() {
+  function openNew(defaults: Row = {}) {
     setEditingId(null);
-    setDraft({});
+    setDraft(defaults);
     setOpen(true);
   }
 
