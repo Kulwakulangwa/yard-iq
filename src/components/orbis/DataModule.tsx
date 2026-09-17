@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Download, Eye, FileText, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
+import { Check, Download, Eye, FileText, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -237,7 +237,7 @@ export function DataModule({
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem onClick={() => setStatus.mutate({ id, value: nextStatus })}>
-                                    <CheckCircle2 className="mr-2 size-4" /> Move to {nextStatus}
+                                    <Check className="mr-2 size-4" /> Move to {nextStatus}
                                   </DropdownMenuItem>
                                 </>
                               ) : null}
