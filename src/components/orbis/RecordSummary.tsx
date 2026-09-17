@@ -6,7 +6,6 @@ import { ArrowLeft, MapPin, Pencil } from "lucide-react";
 import { db } from "@/lib/db";
 import { type ModuleConfig, type RefTable } from "@/lib/modules";
 import { formatValue, humanize } from "@/lib/orbis";
-import { tzs } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
