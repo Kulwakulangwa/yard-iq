@@ -139,7 +139,7 @@ export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig
   const { data: row, isLoading, error } = useRecord(config, recordId);
   const { data: refs = {} } = useRefOptions(config.fields);
   const editor = useRecordEditor(config, row ? [row] : []);
-  const titleKey = config.prefixKey ?? config.columns[0];
+  const titleKey = config.prefixKey ?? config.columns[0] ?? "id";
   const refLabel = (table: RefTable | undefined, id: unknown) => table && id ? refs[table]?.find((o) => o.id === String(id))?.label ?? "—" : "—";
   const summaryFields = useMemo(() => config.fields.filter((field) => !field.readOnly || field.key === titleKey), [config.fields, titleKey]);
 

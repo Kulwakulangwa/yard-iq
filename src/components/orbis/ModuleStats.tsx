@@ -15,19 +15,21 @@ export function ModuleStats({ table, rows }: { table: string; rows: Record<strin
     <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {specs.map((spec) => {
         const value = computeStat(rows, spec);
+        const tone = spec.tone ?? "default";
         if (spec.money) {
           const d = dual(value, fx);
-          return <Stat key={spec.label} label={spec.label} value={d.primary} sub={d.secondary} tone={spec.tone} />;
+          return <Stat key={spec.label} label={spec.label} value={d.primary} sub={d.secondary} tone={tone} />;
         }
         return (
           <Stat
             key={spec.label}
             label={spec.label}
             value={`${fmt.format(Number(value))}${spec.suffix ?? ""}`}
-            tone={spec.tone}
+            tone={tone}
           />
         );
       })}
+
     </div>
   );
 }
