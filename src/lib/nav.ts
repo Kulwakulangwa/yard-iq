@@ -59,6 +59,7 @@ export const nav: NavGroup[] = [
 ];
 
 export const moduleSlugs: Record<string, ModuleKey> = {
+  // ─── Friendly sidebar slugs ───────────────────────────────
   trips: "trips",
   loads: "loads",
   customers: "customers",
@@ -79,4 +80,17 @@ export const moduleSlugs: Record<string, ModuleKey> = {
   incidents: "incidents",
   "police-cases": "police_cases",
   zones: "yard_zones",
+
+  // ─── Module key aliases (so /m/<table> URLs also resolve) ─
+  // The reverse lookup in DataModule.tsx uses the module key,
+  // not the sidebar slug — these aliases keep both working.
+  fuel_allocations: "fuel_allocations",
+  work_orders: "work_orders",
+  vehicle_maintenance: "vehicle_maintenance",
+  driver_payments: "driver_payments",
+  operational_expenses: "operational_expenses",
+  vehicle_inspections: "vehicle_inspections",
+  tire_movements: "tire_movements",
+  police_cases: "police_cases",
+  yard_zones: "yard_zones",
 };
