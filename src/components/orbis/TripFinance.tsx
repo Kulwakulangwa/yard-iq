@@ -1,33 +1,28 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { db } from "@/lib/db";
-import { tzs, usd } from "@/lib/money";
+import { advanceAmount, tzs, usd } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+type Finance = {
+  contract_amount: number;
+  fx_exchange_rate: number;
+  advance_input_type: string;
+  advance_value: number;
+  advance_paid_usd: number;
+  advance_paid_tzs: number;
+  customer_paid_tzs: number;
+};
+
 export function TripFinance({ tripId }: { tripId: string }) {
-  const fx = useFxRate();
-  const qc = useQueryClient();
-  const [customerPaid, setCustomerPaid] = useState("0");
-  const [busy, setBusy] = useState(false);
+  const defaultFx = useFxRate();
 
-  const { data: trucks = [] } = useQuery({
-    queryKey: ["trip-vehicles", tripId],
-    queryFn: async () => {
-      const { data, error } = await db
-        .from("trip_vehicles")
-        .select("*")
-        .eq("trip_id", tripId);
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
-  });
-
-  const { data: finance } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["trip-finance", tripId],
     queryFn: async () => {
       const { data, error } = await db
@@ -40,37 +35,69 @@ export function TripFinance({ tripId }: { tripId: string }) {
     },
   });
 
-  useEffect(() => {
-    if (finance) setCustomerPaid(String(finance.customer_paid_tzs ?? 0));
-  }, [finance]);
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading trip finances…</p>;
+  }
 
-  const totalContractUsd = trucks.reduce(
-    (s, t) => s + Number(t.contract_amount ?? 0),
-    0,
+  const initial: Finance = {
+    contract_amount: Number(data?.contract_amount ?? 0),
+    fx_exchange_rate: Number(data?.fx_exchange_rate ?? defaultFx),
+    advance_input_type: data?.advance_input_type ?? "percentage",
+    advance_value: Number(data?.advance_value ?? 0),
+    advance_paid_usd: Number(data?.advance_paid_usd ?? 0),
+    advance_paid_tzs: Number(data?.advance_paid_tzs ?? 0),
+    customer_paid_tzs: Number(data?.customer_paid_tzs ?? 0),
+  };
+
+  return (
+    <FinanceForm
+      key={`${tripId}-${data?.updated_at ?? "new"}`}
+      tripId={tripId}
+      initial={initial}
+    />
   );
-  const totalContractTzs = totalContractUsd * fx;
-  const totalAdvanceTzs = trucks.reduce(
-    (s, t) =>
-      s + Number(t.advance_paid_tzs ?? 0) + Number(t.advance_paid_usd ?? 0) * fx,
-    0,
+}
+
+function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<Finance>(initial);
+  const [busy, setBusy] = useState(false);
+
+  const totalTzs = draft.contract_amount * draft.fx_exchange_rate;
+  const advanceUsd = advanceAmount(
+    draft.contract_amount,
+    draft.advance_input_type,
+    draft.advance_value,
   );
-  const totalAdvanceUsd = totalAdvanceTzs / fx;
-  const paid = Number(customerPaid || 0);
-  const balance = totalContractTzs - paid;
+  const advanceTzs = advanceUsd * draft.fx_exchange_rate;
+
+  const num = (v: string) => (v === "" ? 0 : Number(v));
 
   async function save() {
+    if (
+      draft.fx_exchange_rate <= 0 ||
+      draft.contract_amount < 0 ||
+      draft.advance_value < 0 ||
+      (draft.advance_input_type === "percentage" && draft.advance_value > 100) ||
+      advanceUsd > draft.contract_amount
+    ) {
+      toast.error(
+        "Enter valid amounts, a positive exchange rate, and an advance within the contract value.",
+      );
+      return;
+    }
     setBusy(true);
     const { error } = await db.from("trip_financials").upsert(
       {
         trip_id: tripId,
         contract_currency: "USD",
-        contract_amount: totalContractUsd,
-        fx_exchange_rate: fx,
-        advance_input_type: "fixed",
-        advance_value: totalAdvanceUsd,
-        advance_paid_usd: totalAdvanceUsd,
-        advance_paid_tzs: totalAdvanceTzs,
-        customer_paid_tzs: paid,
+        contract_amount: draft.contract_amount,
+        fx_exchange_rate: draft.fx_exchange_rate,
+        advance_input_type: draft.advance_input_type,
+        advance_value: draft.advance_value,
+        advance_paid_usd: advanceUsd,
+        advance_paid_tzs: advanceTzs,
+        customer_paid_tzs: draft.customer_paid_tzs,
       },
       { onConflict: "trip_id" },
     );
@@ -79,83 +106,132 @@ export function TripFinance({ tripId }: { tripId: string }) {
       toast.error(error.message);
       return;
     }
-    qc.invalidateQueries({ queryKey: ["trip-finance", tripId] });
-    qc.invalidateQueries({ queryKey: ["trip-summary", tripId] });
-    qc.invalidateQueries({ queryKey: ["office-dashboard"] });
-    toast.success("Trip totals saved");
+    await qc.invalidateQueries();
+    toast.success("Trip finances saved");
   }
 
   return (
-    <section className="border-t pt-4">
-      <h2 className="mb-1 font-semibold">Trip totals</h2>
-      <p className="mb-3 text-sm text-muted-foreground">
-        Contract value and advances are summed from the trucks above. Only the
-        customer payment is editable here.
-      </p>
+    <div className="space-y-4 border-t pt-4">
+      {/* ── Freight Contract ─────────────────────────────────── */}
+      <section className="rounded-lg border bg-muted/20 p-4">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Freight Contract
+        </h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label className="mb-1.5 block text-sm font-medium">
+              Total contract (USD)
+            </Label>
+            <Input
+              type="number"
+              min="0"
+              step="any"
+              value={draft.contract_amount}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, contract_amount: num(e.target.value) }))
+              }
+            />
+          </div>
+          <div>
+            <Label className="mb-1.5 block text-sm font-medium">
+              FX rate (1 USD = TZS)
+            </Label>
+            <Input
+              type="number"
+              min="0"
+              step="any"
+              value={draft.fx_exchange_rate}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, fx_exchange_rate: num(e.target.value) }))
+              }
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">
+          <span className="text-muted-foreground">Total contract in TZS</span>
+          <strong>{tzs(totalTzs)}</strong>
+        </div>
+      </section>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-md border p-3">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            {trucks.length} truck{trucks.length === 1 ? "" : "s"} · Contract
-          </div>
-          <div className="mt-1 text-lg font-semibold">{usd(totalContractUsd)}</div>
-          <div className="text-xs text-muted-foreground">{tzs(totalContractTzs)}</div>
-        </div>
-        <div className="rounded-md border p-3">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            Advance paid
-          </div>
-          <div className="mt-1 text-lg font-semibold text-warning-foreground">
-            {tzs(totalAdvanceTzs)}
-          </div>
-          <div className="text-xs text-muted-foreground">{usd(totalAdvanceUsd)}</div>
-        </div>
-        <div className="rounded-md border p-3">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            Customer paid
-          </div>
-          <div className="mt-1 text-lg font-semibold">{tzs(paid)}</div>
-        </div>
-        <div className="rounded-md border p-3">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            Balance
-          </div>
-          <div
-            className={`mt-1 text-lg font-semibold ${
-              balance > 0 ? "text-warning-foreground" : ""
-            }`}
-          >
-            {tzs(balance)}
-          </div>
-        </div>
-      </div>
+      {/* ── Driver Cash Advance ─────────────────────────────── */}
+      <section className="rounded-lg border bg-muted/20 p-4">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Driver Cash Advance
+        </h3>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="tf-customer" className="mb-1.5 block text-xs text-muted-foreground">
-            Customer paid (TZS)
+        {/* Radio pills */}
+        <div className="mb-3 flex flex-wrap gap-5">
+          {[
+            { value: "percentage", label: "Percentage of contract" },
+            { value: "fixed", label: "Fixed USD amount" },
+          ].map((opt) => {
+            const active = draft.advance_input_type === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() =>
+                  setDraft((d) => ({ ...d, advance_input_type: opt.value }))
+                }
+                className="flex items-center gap-2 text-sm"
+              >
+                <span
+                  className={`flex size-4 items-center justify-center rounded-full border-2 ${
+                    active ? "border-warning-foreground" : "border-muted-foreground/40"
+                  }`}
+                >
+                  {active ? (
+                    <span className="size-2 rounded-full bg-warning-foreground" />
+                  ) : null}
+                </span>
+                <span className={active ? "font-medium" : "text-muted-foreground"}>
+                  {opt.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Advance input */}
+        <div className="mb-3">
+          <Label className="mb-1.5 block text-sm font-medium">
+            {draft.advance_input_type === "percentage" ? "Advance %" : "Advance USD"}
           </Label>
           <Input
-            id="tf-customer"
             type="number"
             min="0"
             step="any"
-            value={customerPaid}
-            onChange={(e) => setCustomerPaid(e.target.value)}
+            value={draft.advance_value}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, advance_value: num(e.target.value) }))
+            }
           />
         </div>
-        <div className="flex items-end text-xs text-muted-foreground">
-          <span>
-            FX rate: <strong>{fx.toLocaleString()}</strong> TZS/USD
-            <br />
-            Change in Settings.
-          </span>
-        </div>
-      </div>
 
-      <Button className="mt-3" onClick={save} disabled={busy}>
-        {busy ? "Saving…" : "Save customer payment"}
+        {/* Computed tiles */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border bg-card p-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Advance USD
+            </div>
+            <div className="mt-1 text-lg font-semibold text-warning-foreground">
+              {usd(advanceUsd)}
+            </div>
+          </div>
+          <div className="rounded-md border bg-card p-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Advance TZS
+            </div>
+            <div className="mt-1 text-lg font-semibold text-warning-foreground">
+              {tzs(advanceTzs)}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Button onClick={save} disabled={busy}>
+        {busy ? "Saving…" : "Save finances"}
       </Button>
-    </section>
+    </div>
   );
 }
