@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin, Pencil } from "lucide-react";
 
 import { db } from "@/lib/db";
-import { type ModuleConfig, type RefTable } from "@/lib/modules";
+import { modules, type ModuleConfig, type RefTable } from "@/lib/modules";
 import { formatValue, humanize } from "@/lib/orbis";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,17 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
   });
   const finance = data.finance;
 
+  // Lightweight query for existing expense numbers so the auto-numbering
+  // (EXP-####) doesn't collide when adding a new expense from this trip page.
+  const { data: allExpenses = [] } = useQuery({
+    queryKey: ["expenses-numbers"],
+    queryFn: async () => {
+      const { data } = await db.from("expenses").select("id, expense_number");
+      return (data ?? []) as Row[];
+    },
+  });
+  const expenseEditor = useRecordEditor(modules.expenses, allExpenses);
+
   return (
     <>
       <TripSummaryCards finance={finance} expenses={data.expenses} fx={fx} />
@@ -84,7 +95,16 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
             <h2 className="font-semibold">Itemized expenses</h2>
             <p className="text-sm text-muted-foreground">Filter by category, review receipts, and audit the driver cash-flow.</p>
           </div>
-          <TripExpensesTable expenses={data.expenses} />
+          <TripExpensesTable
+            expenses={data.expenses}
+            onAddExpense={() =>
+              expenseEditor.openNew({
+                trip_id: tripId,
+                expense_date: new Date().toISOString().slice(0, 10),
+                currency: "TZS",
+              })
+            }
+          />
         </Card>
 
         <Card className="p-4">
@@ -102,6 +122,8 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
           </div>
         </Card>
       </section>
+
+      {expenseEditor.dialog}
     </>
   );
 }
