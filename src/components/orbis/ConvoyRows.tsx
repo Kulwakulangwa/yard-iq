@@ -121,3 +121,70 @@ export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: n
     </>
   );
 }
+
+/**
+ * Full vertical card-list of every vehicle on a trip.
+ * Used on the trip summary page (not the list page).
+ */
+export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
+  if (legs.length === 0) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        No vehicles assigned yet. Use <strong>Edit trip</strong> to add them.
+      </div>
+    );
+  }
+
+  return (
+    <ul className="divide-y">
+      {legs.map((leg, i) => (
+        <li key={leg.id} className="p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Truck className="size-4 text-primary" />
+            <span className="text-base font-semibold">{leg.vehicle}</span>
+            <span className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary">
+              {leg.role || (i === 0 ? "Lead" : "Follower")}
+            </span>
+            <span className="ml-auto text-xs text-muted-foreground">Leg {i + 1}</span>
+          </div>
+
+          <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Driver</dt>
+              <dd className="mt-0.5 truncate font-medium">{leg.driver || "—"}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Trailer</dt>
+              <dd className="mt-0.5 truncate font-medium">{leg.trailer || "—"}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Latest location</dt>
+              <dd className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">
+                  {leg.location || "No location reported"}
+                  {leg.checkpoint ? ` · ${leg.checkpoint}` : ""}
+                </span>
+              </dd>
+            </div>
+            {leg.reportedAt ? (
+              <div className="min-w-0">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Reported</dt>
+                <dd className="mt-0.5 text-muted-foreground">
+                  {ago(leg.reportedAt)}
+                  {leg.reportedBy ? ` · ${leg.reportedBy}` : ""}
+                </dd>
+              </div>
+            ) : null}
+            {leg.notes ? (
+              <div className="min-w-0 sm:col-span-2 lg:col-span-3">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Note</dt>
+                <dd className="mt-0.5 text-muted-foreground">{leg.notes}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </li>
+      ))}
+    </ul>
+  );
+}
