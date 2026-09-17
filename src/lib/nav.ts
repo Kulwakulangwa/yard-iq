@@ -20,7 +20,6 @@ export const nav: NavGroup[] = [
       { label: "Contracts", icon: "FileSignature", to: "/m/contracts", module: "contracts" },
       { label: "Vehicles", icon: "Truck", to: "/vehicles" },
       { label: "Drivers", icon: "IdCard", to: "/drivers" },
-      { label: "Driver Payments", icon: "Wallet", to: "/m/driver-payments", module: "driver_payments" },
       { label: "Fuel Management", icon: "Fuel", to: "/m/fuel", module: "fuel_allocations" },
       { label: "Work Orders", icon: "Wrench", to: "/m/work-orders", module: "work_orders" },
       { label: "Maintenance", icon: "Settings2", to: "/m/maintenance", module: "vehicle_maintenance" },
@@ -69,6 +68,8 @@ export const moduleSlugs: Record<string, ModuleKey> = {
   fuel: "fuel_allocations",
   "work-orders": "work_orders",
   maintenance: "vehicle_maintenance",
+  // driver-payments is deliberately not exposed in the sidebar —
+  // payments are managed from the driver detail page instead.
   "driver-payments": "driver_payments",
   "operational-expenses": "operational_expenses",
   technicians: "technicians",
@@ -81,9 +82,7 @@ export const moduleSlugs: Record<string, ModuleKey> = {
   "police-cases": "police_cases",
   zones: "yard_zones",
 
-  // ─── Module key aliases (so /m/<table> URLs also resolve) ─
-  // The reverse lookup in DataModule.tsx uses the module key,
-  // not the sidebar slug — these aliases keep both working.
+  // ─── Module key aliases ───────────────────────────────────
   fuel_allocations: "fuel_allocations",
   work_orders: "work_orders",
   vehicle_maintenance: "vehicle_maintenance",
@@ -94,3 +93,9 @@ export const moduleSlugs: Record<string, ModuleKey> = {
   police_cases: "police_cases",
   yard_zones: "yard_zones",
 };
+
+// ─── Legacy redirects ──────────────────────────────────────
+// Old bookmarks to /m/driver-payments land on the Drivers list.
+// The Driver Payments module itself is still registered (so the
+// RecordEditor works from the driver profile), it's just not
+// surfaced as a standalone page anymore.
