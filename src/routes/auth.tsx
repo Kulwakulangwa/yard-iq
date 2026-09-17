@@ -99,7 +99,19 @@ function AuthPage() {
             <Label htmlFor="email" className="mb-1.5 block text-xs text-muted-foreground">
               Work email
             </Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setErrorMsg(null);
+              }}
+              required
+            />
           </div>
           <div>
             <Label htmlFor="pw" className="mb-1.5 block text-xs text-muted-foreground">
@@ -108,12 +120,17 @@ function AuthPage() {
             <Input
               id="pw"
               type="password"
+              autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setErrorMsg(null);
+              }}
               required
               minLength={6}
             />
           </div>
+
           {errorMsg ? (
             <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {errorMsg}
