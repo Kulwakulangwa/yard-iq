@@ -16,6 +16,7 @@ import { ConvoyLegRows, useConvoyLegs } from "./ConvoyRows";
 import { ModuleStats } from "./ModuleStats";
 import { StatusBadge } from "./StatusBadge";
 import { TripSummaryCards } from "./TripSummaryCards";
+import { TripExpensesTable } from "./TripExpensesTable";
 import { useRecordEditor, useRefOptions, type Row } from "./RecordEditor";
 
 function useRecord(config: ModuleConfig, recordId: string) {
@@ -49,8 +50,6 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
     },
   });
   const finance = data.finance;
-  const expenseTotal = data.expenses.reduce((sum, expense) => sum + Number(expense["amount"] ?? 0), 0);
-  const ref = (table: RefTable, id: unknown) => refs[table]?.find((item) => item.id === String(id))?.label ?? "—";
 
   return (
     <>
@@ -84,25 +83,9 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
         <Card className="overflow-hidden">
           <div className="border-b px-4 py-3">
             <h2 className="font-semibold">Itemized expenses</h2>
-            <p className="text-sm text-muted-foreground">Costs recorded against this trip.</p>
+            <p className="text-sm text-muted-foreground">Filter by category, review receipts, and audit the driver cash-flow.</p>
           </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader><TableRow><TableHead>Category</TableHead><TableHead>Supplier</TableHead><TableHead>Vehicle</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {data.expenses.length === 0 ? <TableRow><TableCell colSpan={5}>No expenses logged.</TableCell></TableRow> : data.expenses.map((expense) => (
-                  <TableRow key={String(expense["id"])}>
-                    <TableCell className="font-medium">{formatValue(expense["category"])}</TableCell>
-                    <TableCell>{formatValue(expense["supplier"])}</TableCell>
-                    <TableCell>{ref("vehicles", expense["vehicle_id"])}</TableCell>
-                    <TableCell className="whitespace-nowrap font-medium">{tzs(Number(expense["amount"] ?? 0))}</TableCell>
-                    <TableCell><StatusBadge value={String(expense["status"] ?? "")} /></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex justify-end border-t bg-muted/30 px-4 py-3 text-sm"><span className="mr-8 text-muted-foreground">Total expenses</span><strong>{tzs(expenseTotal)}</strong></div>
+          <TripExpensesTable expenses={data.expenses} />
         </Card>
 
         <Card className="p-4">
