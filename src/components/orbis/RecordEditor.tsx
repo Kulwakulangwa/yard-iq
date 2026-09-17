@@ -82,8 +82,15 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   });
 
   function openNew(defaults: Row = {}) {
+    // Guard: if this is used directly as an onClick handler (`onClick={openNew}`),
+    // React passes a click event as the first argument. Ignore anything that
+    // isn't a plain object of field values.
+    const isReactEvent =
+      defaults !== null &&
+      typeof defaults === "object" &&
+      typeof (defaults as { preventDefault?: unknown }).preventDefault === "function";
     setEditingId(null);
-    setDraft(defaults);
+    setDraft(isReactEvent ? {} : defaults);
     setOpen(true);
   }
 
