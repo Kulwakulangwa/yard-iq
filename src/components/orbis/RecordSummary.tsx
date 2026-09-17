@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MapPin, Pencil } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil, Plus } from "lucide-react";
 
 import { db } from "@/lib/db";
 import { modules, type ModuleConfig, type RefTable } from "@/lib/modules";
@@ -14,6 +14,7 @@ import { PageHeader } from "./AppShell";
 import { ConvoyLegRows, useConvoyLegs } from "./ConvoyRows";
 import { ModuleStats } from "./ModuleStats";
 import { StatusBadge } from "./StatusBadge";
+import { TripHeader } from "./TripHeader";
 import { TripSummaryCards } from "./TripSummaryCards";
 import { TripExpensesTable } from "./TripExpensesTable";
 import { useRecordEditor, useRefOptions, type Row } from "./RecordEditor";
@@ -29,7 +30,15 @@ function useRecord(config: ModuleConfig, recordId: string) {
   });
 }
 
-function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, { id: string; label: string }[]>> }) {
+function TripSummary({
+  row,
+  refs,
+  tripEditor,
+}: {
+  row: Row;
+  refs: Partial<Record<RefTable, { id: string; label: string }[]>>;
+  tripEditor: ReturnType<typeof useRecordEditor>;
+}) {
   const tripId = String(row["id"]);
   const fx = useFxRate();
   const { data: convoy } = useConvoyLegs();
@@ -50,8 +59,6 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
   });
   const finance = data.finance;
 
-  // Lightweight query for existing expense numbers so the auto-numbering
-  // (EXP-####) doesn't collide when adding a new expense from this trip page.
   const { data: allExpenses = [] } = useQuery({
     queryKey: ["expenses-numbers"],
     queryFn: async () => {
@@ -61,8 +68,31 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
   });
   const expenseEditor = useRecordEditor(modules.expenses, allExpenses);
 
+  function handleAddExpense() {
+    expenseEditor.openNew({
+      trip_id: tripId,
+      expense_date: new Date().toISOString().slice(0, 10),
+      currency: "TZS",
+    });
+  }
+
   return (
     <>
+      <TripHeader
+        row={row}
+        refs={refs}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => tripEditor.openEdit(row)}>
+              <Pencil className="size-4" /> Edit trip
+            </Button>
+            <Button onClick={handleAddExpense}>
+              <Plus className="size-4" /> Add expense
+            </Button>
+          </>
+        }
+      />
+
       <TripSummaryCards finance={finance} expenses={data.expenses} fx={fx} />
 
       <section className="mt-6">
@@ -97,13 +127,7 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
           </div>
           <TripExpensesTable
             expenses={data.expenses}
-            onAddExpense={() =>
-              expenseEditor.openNew({
-                trip_id: tripId,
-                expense_date: new Date().toISOString().slice(0, 10),
-                currency: "TZS",
-              })
-            }
+            onAddExpense={handleAddExpense}
           />
         </Card>
 
@@ -123,6 +147,7 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
         </Card>
       </section>
 
+      {tripEditor.dialog}
       {expenseEditor.dialog}
     </>
   );
@@ -139,34 +164,44 @@ export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading summary…</p>;
   if (error || !row) return <Card className="p-8 text-center"><h1 className="font-semibold">Record not found</h1><Button asChild variant="link"><Link to="/m/$slug" params={{ slug }}>Back to {config.title.toLowerCase()}</Link></Button></Card>;
 
+  const backLink = (
+    <Link to="/m/$slug" params={{ slug }} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <ArrowLeft className="size-4" /> All {config.title.toLowerCase()}
+    </Link>
+  );
+
+  if (config.table === "trips") {
+    return (
+      <>
+        {backLink}
+        <TripSummary row={row} refs={refs} tripEditor={editor} />
+      </>
+    );
+  }
+
   const route = row["origin"] && row["destination"] ? `${row["origin"]} → ${row["destination"]}` : config.subtitle;
   return (
     <>
-      <Link to="/m/$slug" params={{ slug }} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> All {config.title.toLowerCase()}</Link>
+      {backLink}
       <PageHeader
         title={String(row[titleKey] ?? config.title.replace(/s$/, ""))}
         subtitle={String(route)}
-        actions={<Button onClick={() => editor.openEdit(row)}><Pencil className="size-4" /> Edit {config.table === "trips" ? "trip" : "record"}</Button>}
+        actions={<Button onClick={() => editor.openEdit(row)}><Pencil className="size-4" /> Edit record</Button>}
       />
       {editor.dialog}
       {config.statusKey ? <div className="mb-4"><StatusBadge value={String(row[config.statusKey] ?? "")} /></div> : null}
-
-      {config.table === "trips" ? <TripSummary row={row} refs={refs} /> : (
-        <>
-          <ModuleStats table={config.table} rows={[row]} />
-          <Card className="overflow-hidden">
-            <div className="border-b px-4 py-3"><h2 className="font-semibold">Record summary</h2><p className="text-sm text-muted-foreground">Complete operational information for this record.</p></div>
-            <dl className="grid sm:grid-cols-2 xl:grid-cols-3">
-              {summaryFields.map((field) => (
-                <div key={field.key} className="min-w-0 border-b p-4 sm:border-r">
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">{field.label ?? humanize(field.key)}</dt>
-                  <dd className="mt-1 break-words text-sm font-medium">{field.type === "ref" ? refLabel(field.refTable, row[field.key]) : field.key === config.statusKey ? <StatusBadge value={String(row[field.key] ?? "")} /> : formatValue(row[field.key])}</dd>
-                </div>
-              ))}
-            </dl>
-          </Card>
-        </>
-      )}
+      <ModuleStats table={config.table} rows={[row]} />
+      <Card className="overflow-hidden">
+        <div className="border-b px-4 py-3"><h2 className="font-semibold">Record summary</h2><p className="text-sm text-muted-foreground">Complete operational information for this record.</p></div>
+        <dl className="grid sm:grid-cols-2 xl:grid-cols-3">
+          {summaryFields.map((field) => (
+            <div key={field.key} className="min-w-0 border-b p-4 sm:border-r">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">{field.label ?? humanize(field.key)}</dt>
+              <dd className="mt-1 break-words text-sm font-medium">{field.type === "ref" ? refLabel(field.refTable, row[field.key]) : field.key === config.statusKey ? <StatusBadge value={String(row[field.key] ?? "")} /> : formatValue(row[field.key])}</dd>
+            </div>
+          ))}
+        </dl>
+      </Card>
     </>
   );
 }
