@@ -6,7 +6,7 @@ import { ArrowLeft, MapPin, Pencil } from "lucide-react";
 import { db } from "@/lib/db";
 import { type ModuleConfig, type RefTable } from "@/lib/modules";
 import { formatValue, humanize } from "@/lib/orbis";
-import { tzs, usd } from "@/lib/money";
+import { tzs } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { PageHeader } from "./AppShell";
 import { ConvoyLegRows, useConvoyLegs } from "./ConvoyRows";
 import { ModuleStats } from "./ModuleStats";
 import { StatusBadge } from "./StatusBadge";
-import { Stat } from "./Stat";
+import { TripSummaryCards } from "./TripSummaryCards";
 import { useRecordEditor, useRefOptions, type Row } from "./RecordEditor";
 
 function useRecord(config: ModuleConfig, recordId: string) {
@@ -50,22 +50,11 @@ function TripSummary({ row, refs }: { row: Row; refs: Partial<Record<RefTable, {
   });
   const finance = data.finance;
   const expenseTotal = data.expenses.reduce((sum, expense) => sum + Number(expense["amount"] ?? 0), 0);
-  const advance = Number(finance?.["advance_paid_tzs"] ?? 0) + Number(finance?.["advance_paid_usd"] ?? 0) * fx;
-  const contractTzs = Number(finance?.["total_contract_tzs"] ?? 0);
-  const contractUsd = finance?.["contract_currency"] === "USD"
-    ? Number(finance["contract_amount"] ?? 0)
-    : contractTzs / fx;
-  const cashRemaining = advance - expenseTotal;
   const ref = (table: RefTable, id: unknown) => refs[table]?.find((item) => item.id === String(id))?.label ?? "—";
 
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Contract total" value={usd(contractUsd)} sub={tzs(contractTzs)} />
-        <Stat label="Advance paid" value={tzs(advance)} sub={usd(advance / fx)} tone="amber" />
-        <Stat label="Expenses logged" value={tzs(expenseTotal)} sub={`${data.expenses.length} entries`} />
-        <Stat label="Driver cash remaining" value={tzs(cashRemaining)} sub="Advance − logged expenses" tone={cashRemaining < 0 ? "red" : "green"} />
-      </div>
+      <TripSummaryCards finance={finance} expenses={data.expenses} fx={fx} />
 
       <section className="mt-6">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
