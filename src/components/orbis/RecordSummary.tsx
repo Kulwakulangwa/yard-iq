@@ -120,7 +120,7 @@ function TripSummary({
       </section>
 
       <section className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-        <Card className="overflow-hidden">
+        <Card id="trip-audit" className="overflow-hidden scroll-mt-20">
           <div className="border-b px-4 py-3">
             <h2 className="font-semibold">Itemized expenses</h2>
             <p className="text-sm text-muted-foreground">Filter by category, review receipts, and audit the driver cash-flow.</p>
