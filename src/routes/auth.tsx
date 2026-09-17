@@ -31,13 +31,16 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    setReady(true);
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/dashboard", replace: true });
     });
   }, [navigate]);
+
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
