@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Eye, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -173,8 +173,9 @@ export function DataModule({
                   const id = String(row["id"]);
                   const legs = isTrips ? (convoy?.get(id) ?? []) : [];
                   return (
-                    <>
-                      <TableRow key={id} className="cursor-pointer">
+                    <React.Fragment key={id}>
+                      <TableRow className="cursor-pointer">
+
                         {config.columns.map((c) => {
                           const field = config.fields.find((f) => f.key === c);
                           return (
@@ -232,7 +233,8 @@ export function DataModule({
                         </TableCell>
                       </TableRow>
                       {legs.length > 1 ? <ConvoyLegRows legs={legs} colSpan={colSpan} /> : null}
-                    </>
+                    </React.Fragment>
+
                   );
                 })
               )}
