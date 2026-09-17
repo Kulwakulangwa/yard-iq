@@ -139,9 +139,10 @@ function AuthPage() {
               {errorMsg}
             </p>
           ) : null}
-          <Button type="submit" className="w-full" disabled={busy}>
+          <Button type="submit" className="w-full" disabled={busy || !ready}>
             {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </Button>
+
         </form>
 
         <Button
