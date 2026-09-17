@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Eye, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
+import { CheckCircle2, Download, Eye, FileText, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -14,7 +14,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -55,6 +54,15 @@ export function DataModule({
   const isTrips = config.table === "trips";
   const { data: convoy } = useConvoyLegs();
 
+  // Derive status order from the status field's options array.
+  // Falls back to module-level statusOptions if present.
+  const statusOrder = useMemo(() => {
+    if (!config.statusKey) return [] as string[];
+    const field = config.fields.find((f) => f.key === config.statusKey);
+    const opts = (config.statusOptions ?? field?.options ?? []).filter(Boolean);
+    return opts;
+  }, [config.statusKey, config.statusOptions, config.fields]);
+
   const setStatus = useMutation({
     mutationFn: async ({ id, value }: { id: string; value: string }) => {
       const { error } = await db
@@ -74,14 +82,14 @@ export function DataModule({
   const tabs = useMemo(() => {
     if (!config.statusKey) return [];
     const present = new Set(rows.map((r) => String(r[config.statusKey!] ?? "")).filter(Boolean));
-    const ordered = (config.statusOptions ?? []).filter((o) => present.has(o));
+    const ordered = statusOrder.filter((o) => present.has(o));
     const extras = [...present].filter((p) => !ordered.includes(p));
     const values = ordered.length > 0 ? [...ordered, ...extras] : [...present];
     return values.map((v) => ({
       value: v,
       count: rows.filter((r) => String(r[config.statusKey!] ?? "") === v).length,
     }));
-  }, [rows, config.statusKey, config.statusOptions]);
+  }, [rows, config.statusKey, statusOrder]);
 
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
@@ -172,10 +180,15 @@ export function DataModule({
                 filtered.map((row) => {
                   const id = String(row["id"]);
                   const legs = isTrips ? (convoy?.get(id) ?? []) : [];
+                  const currentStatus = config.statusKey ? String(row[config.statusKey] ?? "") : "";
+                  const currentIdx = statusOrder.indexOf(currentStatus);
+                  const nextStatus =
+                    currentIdx >= 0 && currentIdx < statusOrder.length - 1
+                      ? statusOrder[currentIdx + 1]
+                      : null;
                   return (
                     <React.Fragment key={id}>
                       <TableRow className="cursor-pointer">
-
                         {config.columns.map((c) => {
                           const field = config.fields.find((f) => f.key === c);
                           return (
@@ -206,26 +219,26 @@ export function DataModule({
                               {slug ? (
                                 <DropdownMenuItem asChild>
                                   <Link to="/m/$slug/$recordId" params={{ slug, recordId: id }}>
-                                    <Eye className="mr-2 size-4" /> View summary
+                                    <Eye className="mr-2 size-4" /> View details
+                                  </Link>
+                                </DropdownMenuItem>
+                              ) : null}
+                              {isTrips && slug ? (
+                                <DropdownMenuItem asChild>
+                                  <Link to="/m/$slug/$recordId" params={{ slug, recordId: id }} hash="trip-audit">
+                                    <FileText className="mr-2 size-4" /> Open audit
                                   </Link>
                                 </DropdownMenuItem>
                               ) : null}
                               <DropdownMenuItem onClick={() => openEdit(row)}>
-                                <Pencil className="mr-2 size-4" /> Edit
+                                <Pencil className="mr-2 size-4" /> Edit {isTrips ? "trip" : ""}
                               </DropdownMenuItem>
-                              {config.statusKey && (config.statusOptions ?? []).length > 0 ? (
+                              {nextStatus ? (
                                 <>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuLabel className="text-xs text-muted-foreground">
-                                    Move to
-                                  </DropdownMenuLabel>
-                                  {(config.statusOptions ?? [])
-                                    .filter((o) => o && o !== String(row[config.statusKey!] ?? ""))
-                                    .map((o) => (
-                                      <DropdownMenuItem key={o} onClick={() => setStatus.mutate({ id, value: o })}>
-                                        {o}
-                                      </DropdownMenuItem>
-                                    ))}
+                                  <DropdownMenuItem onClick={() => setStatus.mutate({ id, value: nextStatus })}>
+                                    <CheckCircle2 className="mr-2 size-4" /> Move to {nextStatus}
+                                  </DropdownMenuItem>
                                 </>
                               ) : null}
                             </DropdownMenuContent>
@@ -234,7 +247,6 @@ export function DataModule({
                       </TableRow>
                       {legs.length > 1 ? <ConvoyLegRows legs={legs} colSpan={colSpan} /> : null}
                     </React.Fragment>
-
                   );
                 })
               )}
