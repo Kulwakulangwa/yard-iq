@@ -31,33 +31,42 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    setReady(true);
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/dashboard", replace: true });
     });
   }, [navigate]);
 
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErrorMsg(null);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
-          email,
-          password,
+          email: cleanEmail,
+          password: cleanPassword,
           options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
         toast.success("Account created. You can sign in now.");
         setMode("signin");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: cleanPassword,
+        });
         if (error) throw error;
         navigate({ to: "/dashboard", replace: true });
       }
+
     } catch (err) {
       const message = (err as Error).message;
       setErrorMsg(message);
@@ -93,7 +102,19 @@ function AuthPage() {
             <Label htmlFor="email" className="mb-1.5 block text-xs text-muted-foreground">
               Work email
             </Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setErrorMsg(null);
+              }}
+              required
+            />
           </div>
           <div>
             <Label htmlFor="pw" className="mb-1.5 block text-xs text-muted-foreground">
@@ -102,20 +123,26 @@ function AuthPage() {
             <Input
               id="pw"
               type="password"
+              autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setErrorMsg(null);
+              }}
               required
               minLength={6}
             />
           </div>
+
           {errorMsg ? (
             <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {errorMsg}
             </p>
           ) : null}
-          <Button type="submit" className="w-full" disabled={busy}>
+          <Button type="submit" className="w-full" disabled={busy || !ready}>
             {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </Button>
+
         </form>
 
         <Button
