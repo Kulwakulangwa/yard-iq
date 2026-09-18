@@ -80,7 +80,7 @@ export function useConvoyLegs() {
   });
 }
 
-/** One table line per vehicle in a convoy, rendered under its trip row. */
+/** One table line per vehicle — compact, for the trips list. */
 export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: number }) {
   return (
     <>
@@ -92,7 +92,7 @@ export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: n
                 <Truck className="size-4 shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm font-medium">{leg.vehicle}</span>
                 <span className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                  {leg.role || (i === 0 ? "lead" : "follower")}
+                  {leg.role || (i === 0 ? "Lead" : "Convoy")}
                 </span>
               </div>
               <div className="min-w-0 text-sm text-muted-foreground">
@@ -122,15 +122,12 @@ export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: n
   );
 }
 
-/**
- * Full vertical card-list of every vehicle on a trip.
- * Used on the trip summary page (not the list page).
- */
+/** Full vertical card-list of every truck on a trip. Used on the trip summary page. */
 export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
   if (legs.length === 0) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
-        No vehicles assigned yet. Use <strong>Edit trip</strong> to add them.
+        No trucks assigned yet. Use <strong>Edit trip</strong> to add them.
       </div>
     );
   }
@@ -143,9 +140,9 @@ export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
             <Truck className="size-4 text-primary" />
             <span className="text-base font-semibold">{leg.vehicle}</span>
             <span className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary">
-              {leg.role || (i === 0 ? "Lead" : "Follower")}
+              {leg.role || (i === 0 ? "Lead" : "Convoy")}
             </span>
-            <span className="ml-auto text-xs text-muted-foreground">Leg {i + 1}</span>
+            <span className="ml-auto text-xs text-muted-foreground">Truck {i + 1}</span>
           </div>
 
           <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
