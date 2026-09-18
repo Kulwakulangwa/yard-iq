@@ -30,17 +30,19 @@ function useFleet() {
   return useQuery({
     queryKey: ["fleet-overview"],
     queryFn: async () => {
-      const [vehicles, trips, financials, tripVehicles] = await Promise.all([
+      const [allVehicles, trips, financials, tripVehicles] = await Promise.all([
         selectAll("vehicles"),
         selectAll("trips"),
         selectAll("trip_financials"),
         selectAll("trip_vehicles"),
       ]);
+
+      // Trucks only — trailers appear on the Trailers page.
+      const vehicles = allVehicles.filter((v: any) => !v.is_trailer);
+
       const finByTrip = new Map(financials.map((f) => [f.trip_id, f]));
 
       return vehicles.map((v) => {
-        // Trips where this vehicle is EITHER the lead (trips.vehicle_id)
-        // OR a truck on a convoy leg (trip_vehicles.vehicle_id).
         const convoyTripIds = new Set(
           tripVehicles
             .filter((tv) => String(tv.vehicle_id) === String(v.id))
