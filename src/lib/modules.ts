@@ -15,6 +15,8 @@ export type Field = {
   options?: string[];
   refTable?: RefTable;
   readOnly?: boolean;
+  /** Optional filter applied to ref dropdown options. */
+  refFilter?: { key: string; value: unknown };
 };
 
 export type RefTable =
@@ -136,8 +138,8 @@ export const modules = {
       { key: "destination" },
       { key: "planned_departure", type: "datetime" },
       { key: "planned_arrival", type: "datetime" },
-      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles" },
-      { key: "trailer_id", label: "Trailer", type: "ref", refTable: "vehicles" },
+      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles", refFilter: { key: "is_trailer", value: false } },
+      { key: "trailer_id", label: "Trailer", type: "ref", refTable: "vehicles", refFilter: { key: "is_trailer", value: true } },
       { key: "driver_id", label: "Driver", type: "ref", refTable: "drivers" },
       {
         key: "status",
@@ -190,7 +192,7 @@ export const modules = {
     fields: [
       { key: "reference", readOnly: true },
       { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
-      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles" },
+      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles", refFilter: { key: "is_trailer", value: false } },
       { key: "driver_id", label: "Driver", type: "ref", refTable: "drivers" },
       { key: "fuel_type", type: "select", options: ["Diesel", "Petrol"] },
       { key: "planned_litres", type: "number" },
