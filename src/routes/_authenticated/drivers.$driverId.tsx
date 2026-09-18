@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, MapPin, Phone, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, MapPin, Phone, Truck, Wallet } from "lucide-react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
@@ -48,7 +48,6 @@ function PassportChip({
   expiry: string | null | undefined;
 }) {
   if (!number && !expiry) return null;
-
   const days = daysUntil(expiry);
   const tone =
     days === null
@@ -58,7 +57,6 @@ function PassportChip({
         : days < 90
           ? "text-warning-foreground"
           : "text-muted-foreground";
-
   const hint =
     days === null
       ? ""
@@ -67,7 +65,6 @@ function PassportChip({
         : days < 90
           ? ` — expires in ${days} day${days === 1 ? "" : "s"}`
           : "";
-
   return (
     <span className={`inline-flex items-center gap-1.5 ${tone}`}>
       <span className="text-xs font-semibold uppercase tracking-wide">Passport</span>
@@ -102,7 +99,6 @@ function DriverProfile() {
       const reg = new Map(vehicles.map((v: any) => [String(v.id), v.registration_number]));
       const finByTrip = new Map(tripFinancials.map((f: any) => [String(f.trip_id), f]));
 
-      // Trips where this driver is a convoy leg
       const convoyByTrip = new Map<string, any[]>();
       for (const tv of tripVehicles) {
         if (String(tv.driver_id) !== driverId) continue;
@@ -135,7 +131,22 @@ function DriverProfile() {
       const tripAdvances = ownTrips.reduce((s: number, t: any) => s + t.advance, 0);
       const ownPayments = payments.filter((p: any) => String(p.driver_id) === driverId);
 
-      return { driver, trips: ownTrips, payments: ownPayments, tripAdvances };
+      // Assigned truck/trailer regs
+      const assignedTruck = driver?.assigned_vehicle_id
+        ? reg.get(String(driver.assigned_vehicle_id)) ?? null
+        : null;
+      const assignedTrailer = driver?.assigned_trailer_id
+        ? reg.get(String(driver.assigned_trailer_id)) ?? null
+        : null;
+
+      return {
+        driver,
+        trips: ownTrips,
+        payments: ownPayments,
+        tripAdvances,
+        assignedTruck,
+        assignedTrailer,
+      };
     },
   });
 
@@ -220,6 +231,14 @@ function DriverProfile() {
         {d.base_location ? (
           <span className="inline-flex items-center gap-1.5">
             <MapPin className="size-3.5" /> {String(d.base_location)}
+          </span>
+        ) : null}
+        {data.assignedTruck || data.assignedTrailer ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Truck className="size-3.5" />
+            <span className="text-xs font-semibold uppercase tracking-wide">Assigned</span>
+            {data.assignedTruck ? <span>{data.assignedTruck}</span> : null}
+            {data.assignedTrailer ? <span>+ {data.assignedTrailer}</span> : null}
           </span>
         ) : null}
         <PassportChip number={d.passport_number} expiry={d.passport_expiry} />
