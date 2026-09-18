@@ -31,7 +31,6 @@ export function ago(iso: string) {
   return `${Math.round(hours / 24)} d ago`;
 }
 
-/** Convoy vehicles per trip, each with its own latest reported location. */
 export function useConvoyLegs() {
   return useQuery({
     queryKey: ["convoy-legs"],
@@ -80,7 +79,7 @@ export function useConvoyLegs() {
   });
 }
 
-/** One table line per vehicle — compact, for the trips list. */
+/** Compact — used on the trips list page. */
 export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: number }) {
   return (
     <>
