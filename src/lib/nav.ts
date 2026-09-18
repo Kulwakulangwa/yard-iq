@@ -19,6 +19,7 @@ export const nav: NavGroup[] = [
       { label: "Customers", icon: "Building2", to: "/m/customers", module: "customers" },
       { label: "Contracts", icon: "FileSignature", to: "/m/contracts", module: "contracts" },
       { label: "Vehicles", icon: "Truck", to: "/vehicles" },
+      { label: "Trailers", icon: "Container", to: "/trailers" },
       { label: "Drivers", icon: "IdCard", to: "/drivers" },
       { label: "Fuel Management", icon: "Fuel", to: "/m/fuel", module: "fuel_allocations" },
       { label: "Work Orders", icon: "Wrench", to: "/m/work-orders", module: "work_orders" },
@@ -93,9 +94,3 @@ export const moduleSlugs: Record<string, ModuleKey> = {
   police_cases: "police_cases",
   yard_zones: "yard_zones",
 };
-
-// ─── Legacy redirects ──────────────────────────────────────
-// Old bookmarks to /m/driver-payments land on the Drivers list.
-// The Driver Payments module itself is still registered (so the
-// RecordEditor works from the driver profile), it's just not
-// surfaced as a standalone page anymore.
