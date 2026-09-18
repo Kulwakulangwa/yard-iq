@@ -9,9 +9,8 @@ import { formatValue, humanize } from "@/lib/orbis";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "./AppShell";
-import { ConvoyLegRows, useConvoyLegs } from "./ConvoyRows";
+import { ConvoyLegList, useConvoyLegs } from "./ConvoyRows";
 import { ModuleStats } from "./ModuleStats";
 import { StatusBadge } from "./StatusBadge";
 import { TripHeader } from "./TripHeader";
@@ -98,24 +97,21 @@ function TripSummary({
       <section className="mt-6">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
           <div className="min-w-0">
-            <h2 className="font-semibold">Convoy vehicles</h2>
-            <p className="text-sm text-muted-foreground">Each vehicle, driver and latest tracker-officer location.</p>
+            <h2 className="font-semibold">Trucks on this trip</h2>
+            <p className="text-sm text-muted-foreground">
+              Every truck on this trip, with its own driver, trailer and latest location.
+            </p>
           </div>
           <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-            {legs.length > 1 ? `Convoy · ${legs.length} vehicles` : legs.length === 1 ? "Single vehicle" : "Not assigned"}
+            {legs.length === 0
+              ? "None assigned"
+              : legs.length === 1
+                ? "1 truck"
+                : `${legs.length} trucks`}
           </span>
         </div>
         <Card className="overflow-hidden">
-          {legs.length === 0 ? (
-            <div className="p-5 text-sm text-muted-foreground">No convoy vehicles assigned yet. Use Edit trip to add them.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader><TableRow><TableHead colSpan={4}>Vehicle movement lines</TableHead></TableRow></TableHeader>
-                <TableBody><ConvoyLegRows legs={legs} colSpan={4} /></TableBody>
-              </Table>
-            </div>
-          )}
+          <ConvoyLegList legs={legs} />
         </Card>
       </section>
 
@@ -123,26 +119,40 @@ function TripSummary({
         <Card id="trip-audit" className="overflow-hidden scroll-mt-20">
           <div className="border-b px-4 py-3">
             <h2 className="font-semibold">Itemized expenses</h2>
-            <p className="text-sm text-muted-foreground">Filter by category, review receipts, and audit the driver cash-flow.</p>
+            <p className="text-sm text-muted-foreground">
+              Filter by category, review receipts, and audit the driver cash-flow.
+            </p>
           </div>
-          <TripExpensesTable
-            expenses={data.expenses}
-            onAddExpense={handleAddExpense}
-          />
+          <TripExpensesTable expenses={data.expenses} onAddExpense={handleAddExpense} />
         </Card>
 
         <Card className="p-4">
-          <div className="flex items-center gap-2"><MapPin className="size-4 text-primary" /><h2 className="font-semibold">Location history</h2></div>
+          <div className="flex items-center gap-2">
+            <MapPin className="size-4 text-primary" />
+            <h2 className="font-semibold">Location history</h2>
+          </div>
           <div className="mt-4 space-y-4">
-            {data.locations.length === 0 ? <p className="text-sm text-muted-foreground">No location reported yet.</p> : data.locations.slice(0, 8).map((location, index) => {
-              const leg = legs.find((item) => item.id === String(location["trip_vehicle_id"]));
-              return <div key={String(location["id"])} className="relative border-l pl-4 text-sm">
-                <span className="absolute -left-1 top-1 size-2 rounded-full bg-primary" />
-                <p className="font-medium">{formatValue(location["location"])}</p>
-                <p className="text-muted-foreground">{leg?.vehicle ?? (index === 0 ? "Whole trip" : "Trip update")}{location["checkpoint"] ? ` · ${location["checkpoint"]}` : ""}</p>
-                <p className="text-xs text-muted-foreground">{formatValue(location["reported_at"])}{location["reported_by"] ? ` · ${location["reported_by"]}` : ""}</p>
-              </div>;
-            })}
+            {data.locations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No location reported yet.</p>
+            ) : (
+              data.locations.slice(0, 8).map((location, index) => {
+                const leg = legs.find((item) => item.id === String(location["trip_vehicle_id"]));
+                return (
+                  <div key={String(location["id"])} className="relative border-l pl-4 text-sm">
+                    <span className="absolute -left-1 top-1 size-2 rounded-full bg-primary" />
+                    <p className="font-medium">{formatValue(location["location"])}</p>
+                    <p className="text-muted-foreground">
+                      {leg?.vehicle ?? (index === 0 ? "Whole trip" : "Trip update")}
+                      {location["checkpoint"] ? ` · ${location["checkpoint"]}` : ""}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatValue(location["reported_at"])}
+                      {location["reported_by"] ? ` · ${location["reported_by"]}` : ""}
+                    </p>
+                  </div>
+                );
+              })
+            )}
           </div>
         </Card>
       </section>
@@ -158,14 +168,32 @@ export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig
   const { data: refs = {} } = useRefOptions(config.fields);
   const editor = useRecordEditor(config, row ? [row] : []);
   const titleKey = config.prefixKey ?? config.columns[0] ?? "id";
-  const refLabel = (table: RefTable | undefined, id: unknown) => table && id ? refs[table]?.find((o) => o.id === String(id))?.label ?? "—" : "—";
-  const summaryFields = useMemo(() => config.fields.filter((field) => !field.readOnly || field.key === titleKey), [config.fields, titleKey]);
+  const refLabel = (table: RefTable | undefined, id: unknown) =>
+    table && id ? refs[table]?.find((o) => o.id === String(id))?.label ?? "—" : "—";
+  const summaryFields = useMemo(
+    () => config.fields.filter((field) => !field.readOnly || field.key === titleKey),
+    [config.fields, titleKey],
+  );
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading summary…</p>;
-  if (error || !row) return <Card className="p-8 text-center"><h1 className="font-semibold">Record not found</h1><Button asChild variant="link"><Link to="/m/$slug" params={{ slug }}>Back to {config.title.toLowerCase()}</Link></Button></Card>;
+  if (error || !row)
+    return (
+      <Card className="p-8 text-center">
+        <h1 className="font-semibold">Record not found</h1>
+        <Button asChild variant="link">
+          <Link to="/m/$slug" params={{ slug }}>
+            Back to {config.title.toLowerCase()}
+          </Link>
+        </Button>
+      </Card>
+    );
 
   const backLink = (
-    <Link to="/m/$slug" params={{ slug }} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    <Link
+      to="/m/$slug"
+      params={{ slug }}
+      className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+    >
       <ArrowLeft className="size-4" /> All {config.title.toLowerCase()}
     </Link>
   );
@@ -179,25 +207,47 @@ export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig
     );
   }
 
-  const route = row["origin"] && row["destination"] ? `${row["origin"]} → ${row["destination"]}` : config.subtitle;
+  const route =
+    row["origin"] && row["destination"] ? `${row["origin"]} → ${row["destination"]}` : config.subtitle;
   return (
     <>
       {backLink}
       <PageHeader
         title={String(row[titleKey] ?? config.title.replace(/s$/, ""))}
         subtitle={String(route)}
-        actions={<Button onClick={() => editor.openEdit(row)}><Pencil className="size-4" /> Edit record</Button>}
+        actions={
+          <Button onClick={() => editor.openEdit(row)}>
+            <Pencil className="size-4" /> Edit record
+          </Button>
+        }
       />
       {editor.dialog}
-      {config.statusKey ? <div className="mb-4"><StatusBadge value={String(row[config.statusKey] ?? "")} /></div> : null}
+      {config.statusKey ? (
+        <div className="mb-4">
+          <StatusBadge value={String(row[config.statusKey] ?? "")} />
+        </div>
+      ) : null}
       <ModuleStats table={config.table} rows={[row]} />
       <Card className="overflow-hidden">
-        <div className="border-b px-4 py-3"><h2 className="font-semibold">Record summary</h2><p className="text-sm text-muted-foreground">Complete operational information for this record.</p></div>
+        <div className="border-b px-4 py-3">
+          <h2 className="font-semibold">Record summary</h2>
+          <p className="text-sm text-muted-foreground">Complete operational information for this record.</p>
+        </div>
         <dl className="grid sm:grid-cols-2 xl:grid-cols-3">
           {summaryFields.map((field) => (
             <div key={field.key} className="min-w-0 border-b p-4 sm:border-r">
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">{field.label ?? humanize(field.key)}</dt>
-              <dd className="mt-1 break-words text-sm font-medium">{field.type === "ref" ? refLabel(field.refTable, row[field.key]) : field.key === config.statusKey ? <StatusBadge value={String(row[field.key] ?? "")} /> : formatValue(row[field.key])}</dd>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                {field.label ?? humanize(field.key)}
+              </dt>
+              <dd className="mt-1 break-words text-sm font-medium">
+                {field.type === "ref" ? (
+                  refLabel(field.refTable, row[field.key])
+                ) : field.key === config.statusKey ? (
+                  <StatusBadge value={String(row[field.key] ?? "")} />
+                ) : (
+                  formatValue(row[field.key])
+                )}
+              </dd>
             </div>
           ))}
         </dl>
