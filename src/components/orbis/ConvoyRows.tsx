@@ -45,34 +45,54 @@ export function useConvoyLegs() {
       const vName = new Map(((vehicles ?? []) as Row[]).map((v) => [String(v["id"]), String(v["registration_number"] ?? "")]));
       const dName = new Map(((drivers ?? []) as Row[]).map((d) => [String(d["id"]), String(d["full_name"] ?? "")]));
 
+      // Latest location by leg id (explicit per-truck).
       const latestByLeg = new Map<string, Row>();
-      const latestByTrip = new Map<string, Row>();
+      // Latest location by trip id, only when it is NOT tied to a leg
+      // (i.e. recorded with "Whole trip").
+      const latestTripOnly = new Map<string, Row>();
       for (const loc of (locations ?? []) as Row[]) {
         const legId = loc["trip_vehicle_id"] ? String(loc["trip_vehicle_id"]) : "";
         const tripId = String(loc["trip_id"]);
-        if (legId && !latestByLeg.has(legId)) latestByLeg.set(legId, loc);
-        if (!latestByTrip.has(tripId)) latestByTrip.set(tripId, loc);
+        if (legId) {
+          if (!latestByLeg.has(legId)) latestByLeg.set(legId, loc);
+        } else {
+          if (!latestTripOnly.has(tripId)) latestTripOnly.set(tripId, loc);
+        }
+      }
+
+      // Group legs by trip so we know how many trucks each trip has.
+      const legsByTrip = new Map<string, Row[]>();
+      for (const leg of (legs ?? []) as Row[]) {
+        const tripId = String(leg["trip_id"]);
+        legsByTrip.set(tripId, [...(legsByTrip.get(tripId) ?? []), leg]);
       }
 
       const byTrip = new Map<string, ConvoyLeg[]>();
-      for (const leg of (legs ?? []) as Row[]) {
-        const id = String(leg["id"]);
-        const tripId = String(leg["trip_id"]);
-        const loc = latestByLeg.get(id) ?? latestByTrip.get(tripId) ?? {};
-        const entry: ConvoyLeg = {
-          id,
-          tripId,
-          role: String(leg["role"] ?? ""),
-          notes: String(leg["notes"] ?? ""),
-          vehicle: vName.get(String(leg["vehicle_id"])) ?? "—",
-          trailer: vName.get(String(leg["trailer_id"])) ?? "—",
-          driver: dName.get(String(leg["driver_id"])) ?? "—",
-          location: String(loc["location"] ?? ""),
-          reportedAt: String(loc["reported_at"] ?? ""),
-          reportedBy: String(loc["reported_by"] ?? ""),
-          checkpoint: String(loc["checkpoint"] ?? ""),
-        };
-        byTrip.set(tripId, [...(byTrip.get(tripId) ?? []), entry]);
+      for (const [tripId, tripLegs] of legsByTrip) {
+        const isSoloTrip = tripLegs.length === 1;
+        const tripFallback = latestTripOnly.get(tripId);
+
+        for (const leg of tripLegs) {
+          const id = String(leg["id"]);
+          // Per-truck location wins. On a single-truck trip, fall back
+          // to a "Whole trip" entry. On a convoy, do NOT fall back —
+          // each truck shows its own, or nothing.
+          const loc = latestByLeg.get(id) ?? (isSoloTrip ? tripFallback : undefined) ?? {};
+          const entry: ConvoyLeg = {
+            id,
+            tripId,
+            role: String(leg["role"] ?? ""),
+            notes: String(leg["notes"] ?? ""),
+            vehicle: vName.get(String(leg["vehicle_id"])) ?? "—",
+            trailer: vName.get(String(leg["trailer_id"])) ?? "—",
+            driver: dName.get(String(leg["driver_id"])) ?? "—",
+            location: String(loc["location"] ?? ""),
+            reportedAt: String(loc["reported_at"] ?? ""),
+            reportedBy: String(loc["reported_by"] ?? ""),
+            checkpoint: String(loc["checkpoint"] ?? ""),
+          };
+          byTrip.set(tripId, [...(byTrip.get(tripId) ?? []), entry]);
+        }
       }
       return byTrip;
     },
@@ -121,7 +141,7 @@ export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: n
   );
 }
 
-/** Full vertical card-list of every truck on a trip. Used on the trip summary page. */
+/** Full vertical card-list of every truck on a trip. */
 export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
   if (legs.length === 0) {
     return (
