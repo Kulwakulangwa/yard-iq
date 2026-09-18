@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
 import { modules } from "@/lib/modules";
-import { formatValue, humanize } from "@/lib/orbis";
+import { formatValue } from "@/lib/orbis";
 import { useRecordEditor } from "@/components/orbis/RecordEditor";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,6 +46,7 @@ function VehicleProfile() {
         tireMovements,
         drivers,
         technicians,
+        tripVehicles,
       ] = await Promise.all([
         selectAll("vehicles"),
         selectAll("trips"),
@@ -59,6 +60,7 @@ function VehicleProfile() {
         selectAll("tire_movements"),
         selectAll("drivers"),
         selectAll("technicians"),
+        selectAll("trip_vehicles"),
       ]);
 
       const vehicle = vehicles.find((v: any) => String(v.id) === vehicleId) ?? null;
@@ -67,12 +69,25 @@ function VehicleProfile() {
       const techName = new Map(technicians.map((t: any) => [String(t.id), t.full_name]));
       const tripNum = new Map(trips.map((t: any) => [String(t.id), t.trip_number]));
 
+      // Trips where this vehicle is EITHER the trip's main vehicle
+      // OR a truck on a convoy leg (trip_vehicles).
+      const convoyTripIds = new Set(
+        tripVehicles
+          .filter((tv: any) => String(tv.vehicle_id) === vehicleId)
+          .map((tv: any) => String(tv.trip_id)),
+      );
+
       const ownTrips = trips
-        .filter((t: any) => String(t.vehicle_id) === vehicleId)
+        .filter(
+          (t: any) =>
+            String(t.vehicle_id) === vehicleId || convoyTripIds.has(String(t.id)),
+        )
         .map((t: any) => ({
           ...t,
           driverName: driverName.get(String(t.driver_id)) ?? "—",
           revenue: Number(finByTrip.get(t.id)?.total_contract_tzs ?? 0),
+          isConvoyOnly:
+            String(t.vehicle_id) !== vehicleId && convoyTripIds.has(String(t.id)),
         }));
 
       return {
@@ -93,7 +108,6 @@ function VehicleProfile() {
     },
   });
 
-  // Maintenance + Work Order editor, with vehicle_id pre-filled
   const maintRows = data?.maintenance ?? [];
   const maintenanceEditor = useRecordEditor(modules.vehicle_maintenance, maintRows);
 
@@ -124,7 +138,10 @@ function VehicleProfile() {
   const fuelTabCount = data.fuelAllocations.length + data.fuelExpenses.length;
 
   function openNewMaintenance() {
-    maintenanceEditor.openNew({ vehicle_id: vehicleId, maintenance_date: new Date().toISOString().slice(0, 10) });
+    maintenanceEditor.openNew({
+      vehicle_id: vehicleId,
+      maintenance_date: new Date().toISOString().slice(0, 10),
+    });
   }
 
   return (
@@ -140,11 +157,9 @@ function VehicleProfile() {
         title={String(v.registration_number ?? "Vehicle")}
         subtitle={`${v.vehicle_type ?? "Vehicle"} · ${v.capacity ?? "—"} capacity`}
         actions={
-          <>
-            <Button variant="outline" onClick={openNewMaintenance}>
-              <Plus className="size-4" /> New maintenance
-            </Button>
-          </>
+          <Button variant="outline" onClick={openNewMaintenance}>
+            <Plus className="size-4" /> New maintenance
+          </Button>
         }
       />
       <div className="mb-4">
@@ -185,7 +200,7 @@ function VehicleProfile() {
           </TabsList>
         </div>
 
-        {/* ─────────────────────── DETAILS ─────────────────────── */}
+        {/* DETAILS */}
         <TabsContent value="details" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -229,12 +244,14 @@ function VehicleProfile() {
           </Card>
         </TabsContent>
 
-        {/* ─────────────────────── TRIPS ─────────────────────── */}
+        {/* TRIPS */}
         <TabsContent value="trips" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
               <h2 className="font-semibold">Trip history</h2>
-              <p className="text-sm text-muted-foreground">Every trip this vehicle has been assigned to.</p>
+              <p className="text-sm text-muted-foreground">
+                Trips where this vehicle is the lead truck or a convoy leg.
+              </p>
             </div>
             <div className="overflow-x-auto">
               <Table>
@@ -257,7 +274,16 @@ function VehicleProfile() {
                   ) : (
                     data.trips.map((t: any) => (
                       <TableRow key={String(t.id)}>
-                        <TableCell className="whitespace-nowrap font-medium">{t.trip_number ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap font-medium">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {t.trip_number ?? "—"}
+                            {t.isConvoyOnly ? (
+                              <span className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                Convoy
+                              </span>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell className="whitespace-nowrap">
                           {t.origin ?? "—"} → {t.destination ?? "—"}
                         </TableCell>
@@ -279,7 +305,7 @@ function VehicleProfile() {
           </Card>
         </TabsContent>
 
-        {/* ─────────────────────── MAINTENANCE ─────────────────────── */}
+        {/* MAINTENANCE */}
         <TabsContent value="maintenance" className="mt-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
@@ -378,24 +404,17 @@ function VehicleProfile() {
           ) : null}
         </TabsContent>
 
-        {/* ─────────────────────── FUEL ─────────────────────── */}
+        {/* FUEL */}
         <TabsContent value="fuel" className="mt-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Stat
-              label="Total litres"
-              value={fuelLitres.toLocaleString()}
-              sub="Allocated + expenses"
-              tone="amber"
-            />
+            <Stat label="Total litres" value={fuelLitres.toLocaleString()} sub="Allocated + expenses" tone="amber" />
             <Stat label="Total fuel spend" value={tzs(fuelSpend)} sub="All sources" tone="red" />
           </div>
 
           <Card className="mt-4 overflow-hidden">
             <div className="border-b px-4 py-3">
               <h2 className="font-semibold">Fuel allocations</h2>
-              <p className="text-sm text-muted-foreground">
-                Office-side budget lines for this vehicle.
-              </p>
+              <p className="text-sm text-muted-foreground">Office-side budget lines for this vehicle.</p>
             </div>
             <div className="overflow-x-auto">
               <Table>
@@ -419,9 +438,7 @@ function VehicleProfile() {
                   ) : (
                     data.fuelAllocations.map((f: any) => (
                       <TableRow key={String(f.id)}>
-                        <TableCell className="whitespace-nowrap font-medium">
-                          {f.reference ?? "—"}
-                        </TableCell>
+                        <TableCell className="whitespace-nowrap font-medium">{f.reference ?? "—"}</TableCell>
                         <TableCell className="whitespace-nowrap">
                           {data.tripNum.get(String(f.trip_id)) ?? "—"}
                         </TableCell>
@@ -493,7 +510,7 @@ function VehicleProfile() {
           </Card>
         </TabsContent>
 
-        {/* ─────────────────────── INSPECTIONS ─────────────────────── */}
+        {/* INSPECTIONS */}
         <TabsContent value="inspections" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -541,7 +558,7 @@ function VehicleProfile() {
           </Card>
         </TabsContent>
 
-        {/* ─────────────────────── TIRES ─────────────────────── */}
+        {/* TIRES */}
         <TabsContent value="tires" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
