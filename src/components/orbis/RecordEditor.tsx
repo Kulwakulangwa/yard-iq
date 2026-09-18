@@ -23,19 +23,43 @@ import { TripLocationLog } from "./TripLocationLog";
 
 export type Row = Record<string, unknown>;
 
+type RefOption = { id: string; label: string; [k: string]: unknown };
+
 export function useRefOptions(fields: Field[]) {
   const tables = [...new Set(fields.filter((f) => f.refTable).map((f) => f.refTable as RefTable))];
+
+  // Collect extra columns per table (from any field's refFilter key)
+  const extraColumns: Record<string, string[]> = {};
+  for (const f of fields) {
+    if (!f.refTable || !f.refFilter) continue;
+    const set = new Set(extraColumns[f.refTable] ?? []);
+    set.add(f.refFilter.key);
+    extraColumns[f.refTable] = [...set];
+  }
+
+  const filterKey = JSON.stringify(
+    Object.fromEntries(
+      Object.entries(extraColumns).map(([k, v]) => [k, [...v].sort()]),
+    ),
+  );
+
   return useQuery({
-    queryKey: ["refs", tables.join(",")],
+    queryKey: ["refs", tables.join(","), filterKey],
     enabled: tables.length > 0,
     queryFn: async () => {
-      const out: Partial<Record<RefTable, { id: string; label: string }[]>> = {};
+      const out: Partial<Record<RefTable, RefOption[]>> = {};
       for (const t of tables) {
-        const { data } = await db.from(t).select(`id, ${REF_LABEL[t]}`).limit(500);
-        out[t] = ((data ?? []) as Row[]).map((r) => ({
-          id: String(r["id"]),
-          label: String(r[REF_LABEL[t]] ?? r["id"]),
-        }));
+        const extras = extraColumns[t] ?? [];
+        const cols = ["id", REF_LABEL[t], ...extras].join(", ");
+        const { data } = await db.from(t).select(cols).limit(500);
+        out[t] = ((data ?? []) as Row[]).map((r) => {
+          const entry: RefOption = {
+            id: String(r["id"]),
+            label: String(r[REF_LABEL[t]] ?? r["id"]),
+          };
+          for (const e of extras) entry[e] = r[e];
+          return entry;
+        });
       }
       return out;
     },
@@ -82,15 +106,8 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   });
 
   function openNew(defaults: Row = {}) {
-    // Guard: if this is used directly as an onClick handler (`onClick={openNew}`),
-    // React passes a click event as the first argument. Ignore anything that
-    // isn't a plain object of field values.
-    const isReactEvent =
-      defaults !== null &&
-      typeof defaults === "object" &&
-      typeof (defaults as { preventDefault?: unknown }).preventDefault === "function";
     setEditingId(null);
-    setDraft(isReactEvent ? {} : defaults);
+    setDraft(defaults);
     setOpen(true);
   }
 
@@ -153,11 +170,16 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                     className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">—</option>
-                    {(refs[f.refTable as RefTable] ?? []).map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}
-                      </option>
-                    ))}
+                    {(refs[f.refTable as RefTable] ?? [])
+                      .filter((o) => {
+                        if (!f.refFilter) return true;
+                        return o[f.refFilter.key] === f.refFilter.value;
+                      })
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
                   </select>
                 ) : (
                   <Input
@@ -185,13 +207,13 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
 
         {config.table === "trips" && editingId ? (
           <>
-            <TripFinance tripId={editingId} />
             <TripConvoy tripId={editingId} />
+            <TripFinance tripId={editingId} />
             <TripLocationLog tripId={editingId} />
           </>
         ) : config.table === "trips" ? (
           <p className="text-sm text-muted-foreground">
-            Save the trip first to add its finances, convoy vehicles and location updates.
+            Save the trip first to add its finances, trucks and location updates.
           </p>
         ) : null}
 
