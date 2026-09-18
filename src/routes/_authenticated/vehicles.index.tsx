@@ -30,15 +30,30 @@ function useFleet() {
   return useQuery({
     queryKey: ["fleet-overview"],
     queryFn: async () => {
-      const [vehicles, trips, financials] = await Promise.all([
+      const [vehicles, trips, financials, tripVehicles] = await Promise.all([
         selectAll("vehicles"),
         selectAll("trips"),
         selectAll("trip_financials"),
+        selectAll("trip_vehicles"),
       ]);
       const finByTrip = new Map(financials.map((f) => [f.trip_id, f]));
+
       return vehicles.map((v) => {
-        const own = trips.filter((t) => t.vehicle_id === v.id);
-        const active = own.filter((t) => ["Dispatched", "In-Transit", "In Yard"].includes(String(t.status)));
+        // Trips where this vehicle is EITHER the lead (trips.vehicle_id)
+        // OR a truck on a convoy leg (trip_vehicles.vehicle_id).
+        const convoyTripIds = new Set(
+          tripVehicles
+            .filter((tv) => String(tv.vehicle_id) === String(v.id))
+            .map((tv) => String(tv.trip_id)),
+        );
+        const own = trips.filter(
+          (t) => String(t.vehicle_id) === String(v.id) || convoyTripIds.has(String(t.id)),
+        );
+        const active = own.filter((t) =>
+          ["Dispatched", "In-Transit", "In Transit", "In Yard", "At Border"].includes(
+            String(t.status),
+          ),
+        );
         return {
           ...v,
           tripCount: own.length,
