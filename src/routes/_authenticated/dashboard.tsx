@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       { property: "og:title", content: "Office Dashboard — Orbis Logistics" },
       { property: "og:description", content: "Revenue, cash disbursed, fuel and live trip status for the Orbis border fleet." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
+      { property: "twitter:card", content: "summary" },
     ],
   }),
   component: Dashboard,
@@ -29,21 +29,35 @@ function useOffice() {
   return useQuery({
     queryKey: ["office-dashboard"],
     queryFn: async () => {
-      const [trips, fin, loads, vehicles, invoices, expenses, opex, payments, fuel, exceptions, customers, drivers] =
-        await Promise.all([
-          db.from("trips").select("*"),
-          db.from("trip_financials").select("*"),
-          db.from("loads").select("*"),
-          db.from("vehicles").select("*"),
-          db.from("invoices").select("*"),
-          db.from("expenses").select("*"),
-          db.from("operational_expenses").select("*"),
-          db.from("driver_payments").select("*"),
-          db.from("fuel_allocations").select("*"),
-          db.from("exceptions").select("*"),
-          db.from("customers").select("id,name"),
-          db.from("drivers").select("id,full_name"),
-        ]);
+      const [
+        trips,
+        fin,
+        loads,
+        vehicles,
+        invoices,
+        expenses,
+        opex,
+        payments,
+        fuel,
+        exceptions,
+        customers,
+        drivers,
+        tripVehicles,
+      ] = await Promise.all([
+        db.from("trips").select("*"),
+        db.from("trip_financials").select("*"),
+        db.from("loads").select("*"),
+        db.from("vehicles").select("*"),
+        db.from("invoices").select("*"),
+        db.from("expenses").select("*"),
+        db.from("operational_expenses").select("*"),
+        db.from("driver_payments").select("*"),
+        db.from("fuel_allocations").select("*"),
+        db.from("exceptions").select("*"),
+        db.from("customers").select("id,name"),
+        db.from("drivers").select("id,full_name"),
+        db.from("trip_vehicles").select("*"),
+      ]);
       const arr = (r: any) => (r?.data ?? []) as any[];
       return {
         trips: arr(trips),
@@ -58,6 +72,7 @@ function useOffice() {
         exceptions: arr(exceptions),
         customers: arr(customers),
         drivers: arr(drivers),
+        tripVehicles: arr(tripVehicles),
       };
     },
   });
@@ -116,6 +131,28 @@ function Dashboard() {
     (d?.fin ?? []).forEach((f) => m.set(f.trip_id, f));
     return m;
   }, [d]);
+
+  const trucksByTrip = useMemo(() => {
+    const m = new Map<string, { vehicle: string; driver: string; role: string }[]>();
+    const vehicleReg = new Map<string, string>(
+      (d?.vehicles ?? []).map((v) => [String(v.id), String(v.registration_number ?? "")]),
+    );
+    const driverName = new Map<string, string>(
+      (d?.drivers ?? []).map((dr) => [String(dr.id), String(dr.full_name ?? "")]),
+    );
+    for (const tv of d?.tripVehicles ?? []) {
+      const tripId = String(tv.trip_id);
+      const list = m.get(tripId) ?? [];
+      list.push({
+        vehicle: vehicleReg.get(String(tv.vehicle_id)) ?? "—",
+        driver: driverName.get(String(tv.driver_id)) ?? "—",
+        role: String(tv.role ?? "Lead"),
+      });
+      m.set(tripId, list);
+    }
+    return m;
+  }, [d]);
+
   const nameOf = (list: any[] | undefined, id: string, key: string) =>
     list?.find((r) => r.id === id)?.[key] ?? "—";
 
@@ -186,13 +223,13 @@ function Dashboard() {
             </Tabs>
 
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[920px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="py-2 pr-3">Trip</th>
                     <th className="py-2 pr-3">Customer</th>
                     <th className="py-2 pr-3">Route</th>
-                    <th className="py-2 pr-3">Driver</th>
+                    <th className="py-2 pr-3">Trucks / Drivers</th>
                     <th className="py-2 pr-3">Contract value</th>
                     <th className="py-2 pr-3">Current location</th>
                     <th className="py-2 pr-3">Status</th>
@@ -201,22 +238,43 @@ function Dashboard() {
                 <tbody>
                   {filteredTrips.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-muted-foreground">
+                      <td colSpan={7} className="py-6 text-center text-muted-foreground">
                         No trips in this view.
                       </td>
                     </tr>
                   ) : (
                     filteredTrips.slice(0, 25).map((t) => {
                       const f = finByTrip.get(t.id);
+                      const trucks = trucksByTrip.get(String(t.id)) ?? [];
                       return (
-                        <tr key={t.id} className="border-b last:border-0">
-                          <td className="py-2 pr-3 font-medium">{t.trip_number}</td>
-                          <td className="py-2 pr-3">{nameOf(d?.customers, t.customer_id, "name")}</td>
-                          <td className="py-2 pr-3 text-muted-foreground">
+                        <tr key={t.id} className="border-b last:border-0 align-top">
+                          <td className="py-3 pr-3 font-medium">{t.trip_number}</td>
+                          <td className="py-3 pr-3">{nameOf(d?.customers, t.customer_id, "name")}</td>
+                          <td className="py-3 pr-3 text-muted-foreground">
                             {t.origin} → {t.destination}
                           </td>
-                          <td className="py-2 pr-3">{nameOf(d?.drivers, t.driver_id, "full_name")}</td>
-                          <td className="py-2 pr-3">
+                          <td className="py-3 pr-3">
+                            {trucks.length === 0 ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {trucks.map((tr, i) => (
+                                  <div key={i} className="leading-tight">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium">{tr.vehicle}</span>
+                                      <span className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                        {tr.role}
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {tr.driver}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 pr-3">
                             {f ? (
                               <span>
                                 {tzs(f.total_contract_tzs)}
@@ -228,7 +286,7 @@ function Dashboard() {
                               <span className="text-muted-foreground">—</span>
                             )}
                           </td>
-                          <td className="py-2 pr-3">
+                          <td className="py-3 pr-3">
                             {t.current_location ? (
                               <span>
                                 {t.current_location}
@@ -238,7 +296,7 @@ function Dashboard() {
                               <span className="text-muted-foreground">Not reported</span>
                             )}
                           </td>
-                          <td className="py-2 pr-3">
+                          <td className="py-3 pr-3">
                             <StatusBadge value={t.status} />
                           </td>
                         </tr>
