@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MapPin, Phone, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, MapPin, Phone, Wallet } from "lucide-react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
@@ -25,46 +25,120 @@ export const Route = createFileRoute("/_authenticated/drivers/$driverId")({
   component: DriverProfile,
 });
 
+function formatDate(value: unknown) {
+  if (!value) return "";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function daysUntil(value: unknown): number | null {
+  if (!value) return null;
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return null;
+  const diff = d.getTime() - Date.now();
+  return Math.round(diff / (1000 * 60 * 60 * 24));
+}
+
+function PassportChip({
+  number,
+  expiry,
+}: {
+  number: string | null | undefined;
+  expiry: string | null | undefined;
+}) {
+  if (!number && !expiry) return null;
+
+  const days = daysUntil(expiry);
+  const tone =
+    days === null
+      ? "text-muted-foreground"
+      : days < 0
+        ? "text-destructive"
+        : days < 90
+          ? "text-warning-foreground"
+          : "text-muted-foreground";
+
+  const hint =
+    days === null
+      ? ""
+      : days < 0
+        ? ` — expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago`
+        : days < 90
+          ? ` — expires in ${days} day${days === 1 ? "" : "s"}`
+          : "";
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 ${tone}`}>
+      <span className="text-xs font-semibold uppercase tracking-wide">Passport</span>
+      {number ? <span>{number}</span> : null}
+      {expiry ? (
+        <span>
+          · expires {formatDate(expiry)}
+          {hint}
+        </span>
+      ) : null}
+      {days !== null && days < 90 ? <AlertTriangle className="size-3.5" /> : null}
+    </span>
+  );
+}
+
 function DriverProfile() {
   const { driverId } = useParams({ from: "/_authenticated/drivers/$driverId" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["driver-profile", driverId],
     queryFn: async () => {
-      const [drivers, trips, payments, vehicles, tripFinancials] = await Promise.all([
+      const [drivers, trips, payments, vehicles, tripFinancials, tripVehicles] = await Promise.all([
         selectAll("drivers"),
         selectAll("trips"),
         selectAll("driver_payments"),
         selectAll("vehicles"),
         selectAll("trip_financials"),
+        selectAll("trip_vehicles"),
       ]);
 
       const driver = drivers.find((d: any) => String(d.id) === driverId) ?? null;
       const reg = new Map(vehicles.map((v: any) => [String(v.id), v.registration_number]));
+      const finByTrip = new Map(tripFinancials.map((f: any) => [String(f.trip_id), f]));
+
+      // Trips where this driver is a convoy leg
+      const convoyByTrip = new Map<string, any[]>();
+      for (const tv of tripVehicles) {
+        if (String(tv.driver_id) !== driverId) continue;
+        const tid = String(tv.trip_id);
+        const list = convoyByTrip.get(tid) ?? [];
+        list.push(tv);
+        convoyByTrip.set(tid, list);
+      }
 
       const ownTrips = trips
-        .filter((t: any) => String(t.driver_id) === driverId)
-        .map((t: any) => ({ ...t, vehicle: reg.get(String(t.vehicle_id)) ?? "—" }));
+        .filter(
+          (t: any) => String(t.driver_id) === driverId || convoyByTrip.has(String(t.id)),
+        )
+        .map((t: any) => {
+          const isPrimary = String(t.driver_id) === driverId;
+          const convoyLegs = convoyByTrip.get(String(t.id)) ?? [];
+          const convoyVehicles = convoyLegs
+            .map((leg: any) => reg.get(String(leg.vehicle_id)) ?? "—")
+            .filter((x: string) => x !== "—");
+          return {
+            ...t,
+            isPrimary,
+            isConvoyOnly: !isPrimary && convoyLegs.length > 0,
+            convoyVehicle: convoyVehicles.join(", "),
+            vehicle: reg.get(String(t.vehicle_id)) ?? "—",
+            advance: isPrimary ? Number(finByTrip.get(String(t.id))?.advance_paid_tzs ?? 0) : 0,
+          };
+        });
 
-      const ownTripIds = new Set(ownTrips.map((t: any) => String(t.id)));
-      const finByTrip = new Map(tripFinancials.map((f: any) => [String(f.trip_id), f]));
-      const tripAdvances = ownTrips.reduce(
-        (s: number, t: any) => s + Number(finByTrip.get(String(t.id))?.advance_paid_tzs ?? 0),
-        0,
-      );
-
+      const tripAdvances = ownTrips.reduce((s: number, t: any) => s + t.advance, 0);
       const ownPayments = payments.filter((p: any) => String(p.driver_id) === driverId);
 
-      return {
-        driver,
-        trips: ownTrips,
-        payments: ownPayments,
-        tripAdvances,
-      };
+      return { driver, trips: ownTrips, payments: ownPayments, tripAdvances };
     },
   });
 
-  // Payment editor, with driver_id pre-filled for the Record payment button
   const paymentRows = data?.payments ?? [];
   const paymentEditor = useRecordEditor(modules.driver_payments, paymentRows);
 
@@ -97,8 +171,9 @@ function DriverProfile() {
   const activeTrips = data.trips.filter((t: any) =>
     ["Dispatched", "In Transit", "In Yard"].includes(String(t.status)),
   ).length;
+  const primaryCount = data.trips.filter((t: any) => t.isPrimary).length;
+  const convoyCount = data.trips.filter((t: any) => t.isConvoyOnly).length;
 
-  // Sort payments newest first
   const ledger = [...data.payments].sort((a: any, b: any) =>
     String(b.payment_date ?? "").localeCompare(String(a.payment_date ?? "")),
   );
@@ -136,7 +211,6 @@ function DriverProfile() {
         }
       />
 
-      {/* Contact strip */}
       <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
         {d.phone ? (
           <span className="inline-flex items-center gap-1.5">
@@ -148,15 +222,19 @@ function DriverProfile() {
             <MapPin className="size-3.5" /> {String(d.base_location)}
           </span>
         ) : null}
+        <PassportChip number={d.passport_number} expiry={d.passport_expiry} />
         <StatusBadge value={d.status} />
       </div>
 
-      {/* Four stat cards */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           label="Trips"
           value={data.trips.length}
-          sub={`${activeTrips} active`}
+          sub={
+            convoyCount > 0
+              ? `${primaryCount} primary · ${convoyCount} convoy · ${activeTrips} active`
+              : `${activeTrips} active`
+          }
         />
         <Stat
           label="Trip advances"
@@ -172,18 +250,22 @@ function DriverProfile() {
         <Stat
           label="Salary paid"
           value={tzs(salary)}
-          sub={monthlySalary > 0 ? `Monthly ${tzs(monthlySalary)}` : `${data.payments.length} payment${data.payments.length === 1 ? "" : "s"}`}
+          sub={
+            monthlySalary > 0
+              ? `Monthly ${tzs(monthlySalary)}`
+              : `${data.payments.length} payment${data.payments.length === 1 ? "" : "s"}`
+          }
           tone="green"
         />
       </div>
 
-      {/* Two-column layout on wide screens */}
       <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        {/* Trips driven */}
         <Card className="overflow-hidden">
           <div className="border-b px-4 py-3">
             <h2 className="font-semibold">Trips driven</h2>
-            <p className="text-sm text-muted-foreground">Every trip assigned to this driver.</p>
+            <p className="text-sm text-muted-foreground">
+              Trips where this driver is primary or on a convoy leg.
+            </p>
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -204,9 +286,16 @@ function DriverProfile() {
                   data.trips.map((t: any) => (
                     <TableRow key={String(t.id)}>
                       <TableCell className="whitespace-nowrap font-medium">
-                        {t.trip_number ?? "—"}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {t.trip_number ?? "—"}
+                          {t.isConvoyOnly ? (
+                            <span className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                              Convoy
+                            </span>
+                          ) : null}
+                        </div>
                         <div className="text-xs font-normal text-muted-foreground">
-                          {t.vehicle}
+                          {t.isConvoyOnly && t.convoyVehicle ? t.convoyVehicle : t.vehicle}
                         </div>
                       </TableCell>
                       <TableCell className="min-w-0">
@@ -223,14 +312,7 @@ function DriverProfile() {
                         <StatusBadge value={t.status} />
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right font-medium">
-                        {tzs(
-                          Number(
-                            // fall back to zero when no financials record exists
-                            (data.payments, 0),
-                          ),
-                        ) === "TZS 0" && !t.trip_financials_advance
-                          ? "—"
-                          : tzs(t.trip_financials_advance)}
+                        {t.advance > 0 ? tzs(t.advance) : "—"}
                       </TableCell>
                     </TableRow>
                   ))
@@ -240,7 +322,6 @@ function DriverProfile() {
           </div>
         </Card>
 
-        {/* Payment ledger */}
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
             <div>
