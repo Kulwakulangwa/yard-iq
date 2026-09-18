@@ -54,8 +54,6 @@ export function DataModule({
   const isTrips = config.table === "trips";
   const { data: convoy } = useConvoyLegs();
 
-  // Derive status order from the status field's options array.
-  // Falls back to module-level statusOptions if present.
   const statusOrder = useMemo(() => {
     if (!config.statusKey) return [] as string[];
     const field = config.fields.find((f) => f.key === config.statusKey);
@@ -200,9 +198,10 @@ export function DataModule({
                               ) : (
                                 formatValue(row[c])
                               )}
-                              {isTrips && c === config.columns[0] && legs.length > 1 ? (
+                              {isTrips && c === config.columns[0] && legs.length > 0 ? (
                                 <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-primary/40 px-2 py-0.5 text-[11px] text-primary">
-                                  <Users className="size-3" /> Convoy · {legs.length}
+                                  <Users className="size-3" />{" "}
+                                  {legs.length === 1 ? "1 truck" : `${legs.length} trucks`}
                                 </span>
                               ) : null}
                             </TableCell>
@@ -245,7 +244,9 @@ export function DataModule({
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                      {legs.length > 1 ? <ConvoyLegRows legs={legs} colSpan={colSpan} /> : null}
+                      {isTrips && legs.length > 0 ? (
+                        <ConvoyLegRows legs={legs} colSpan={colSpan} />
+                      ) : null}
                     </React.Fragment>
                   );
                 })
