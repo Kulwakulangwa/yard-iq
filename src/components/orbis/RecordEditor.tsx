@@ -129,7 +129,10 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {editingId ? "Edit" : "New"} {config.title.replace(/s$/, "")}
+            {editingId ? "Edit" : "New"}{" "}
+            {config.table === "vehicles" && Boolean(draft["is_trailer"])
+              ? "Trailer"
+              : config.title.replace(/s$/, "")}
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
