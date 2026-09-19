@@ -4,7 +4,8 @@ import { CheckCircle2, Clock, Receipt as ReceiptIcon, XCircle } from "lucide-rea
 import { toast } from "sonner";
 
 import { db } from "@/lib/db";
-import { tzs } from "@/lib/money";
+import { dualDisplay, tzs, usd } from "@/lib/money";
+import { useFxRate } from "@/lib/fx";
 import { logAudit } from "@/lib/orbis";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -43,6 +44,7 @@ function matchStatusFilter(status: string, filter: string) {
 
 export function ExpensesPage() {
   const qc = useQueryClient();
+  const fx = useFxRate();
   const [term, setTerm] = useState("");
   const [catFilter, setCatFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -104,18 +106,22 @@ export function ExpensesPage() {
   const rows = data?.expenses ?? [];
 
   const stats = useMemo(() => {
-    let total = 0;
-    let verified = 0;
-    let pending = 0;
+    let totalTzs = 0;
+    let verifiedTzs = 0;
+    let pendingTzs = 0;
     for (const r of rows) {
-      const amt = Number(r["amount"] ?? 0);
-      total += amt;
+      const { tzsValue } = dualDisplay(
+        Number(r["amount"] ?? 0),
+        String(r["currency"] ?? "TZS"),
+        fx,
+      );
+      totalTzs += tzsValue;
       const s = String(r["status"] ?? "");
-      if (VERIFIED_STATUSES.includes(s)) verified += amt;
-      if (PENDING_STATUSES.includes(s)) pending += amt;
+      if (VERIFIED_STATUSES.includes(s)) verifiedTzs += tzsValue;
+      if (PENDING_STATUSES.includes(s)) pendingTzs += tzsValue;
     }
-    return { total, verified, pending };
-  }, [rows]);
+    return { totalTzs, verifiedTzs, pendingTzs };
+  }, [rows, fx]);
 
   const visible = useMemo(() => {
     const t = term.trim().toLowerCase();
@@ -158,17 +164,20 @@ export function ExpensesPage() {
         <SummaryCard
           icon={<ReceiptIcon className="size-5 text-warning-foreground" />}
           label="Total logged"
-          value={tzs(stats.total)}
+          primary={tzs(stats.totalTzs)}
+          secondary={usd(stats.totalTzs / (fx > 0 ? fx : 2600))}
         />
         <SummaryCard
           icon={<CheckCircle2 className="size-5 text-success" />}
           label="Verified"
-          value={tzs(stats.verified)}
+          primary={tzs(stats.verifiedTzs)}
+          secondary={usd(stats.verifiedTzs / (fx > 0 ? fx : 2600))}
         />
         <SummaryCard
           icon={<Clock className="size-5 text-warning-foreground" />}
           label="Pending review"
-          value={tzs(stats.pending)}
+          primary={tzs(stats.pendingTzs)}
+          secondary={usd(stats.pendingTzs / (fx > 0 ? fx : 2600))}
         />
       </div>
 
@@ -232,6 +241,11 @@ export function ExpensesPage() {
                   const trip = tripsById.get(String(r["trip_id"]));
                   const status = String(r["status"] ?? "");
                   const isPending = PENDING_STATUSES.includes(status);
+                  const display = dualDisplay(
+                    Number(r["amount"] ?? 0),
+                    String(r["currency"] ?? "TZS"),
+                    fx,
+                  );
                   const vehicleReg = r["vehicle_id"]
                     ? vehicleById.get(String(r["vehicle_id"]))
                     : trip
@@ -269,8 +283,11 @@ export function ExpensesPage() {
                       <TableCell className="max-w-[220px] align-top">
                         <span className="block truncate">{description || "—"}</span>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-right align-top font-medium">
-                        {tzs(r["amount"])}
+                      <TableCell className="whitespace-nowrap text-right align-top">
+                        <div className="font-medium">{display.primary}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {display.secondary}
+                        </div>
                       </TableCell>
                       <TableCell className="align-top text-xs">
                         {r["receipt_url"] ? (
@@ -338,11 +355,13 @@ export function ExpensesPage() {
 function SummaryCard({
   icon,
   label,
-  value,
+  primary,
+  secondary,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  primary: string;
+  secondary: string;
 }) {
   return (
     <Card className="p-5">
@@ -352,7 +371,8 @@ function SummaryCard({
       <p className="mt-4 text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-2xl font-semibold">{primary}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{secondary}</p>
     </Card>
   );
 }
