@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { db } from "@/lib/db";
-import { advanceAmount, tzs, usd } from "@/lib/money";
+import { tzs, usd } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 
 type Finance = {
   contract_amount: number;
+  contract_currency: string;
   fx_exchange_rate: number;
   advance_input_type: string;
   advance_value: number;
@@ -41,6 +42,7 @@ export function TripFinance({ tripId }: { tripId: string }) {
 
   const initial: Finance = {
     contract_amount: Number(data?.contract_amount ?? 0),
+    contract_currency: String(data?.contract_currency ?? "USD"),
     fx_exchange_rate: Number(data?.fx_exchange_rate ?? defaultFx),
     advance_input_type: data?.advance_input_type ?? "percentage",
     advance_value: Number(data?.advance_value ?? 0),
@@ -63,13 +65,22 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
   const [draft, setDraft] = useState<Finance>(initial);
   const [busy, setBusy] = useState(false);
 
-  const totalTzs = draft.contract_amount * draft.fx_exchange_rate;
-  const advanceUsd = advanceAmount(
-    draft.contract_amount,
-    draft.advance_input_type,
-    draft.advance_value,
-  );
-  const advanceTzs = advanceUsd * draft.fx_exchange_rate;
+  const rate = draft.fx_exchange_rate > 0 ? draft.fx_exchange_rate : 1;
+  const isUsd = draft.contract_currency === "USD";
+
+  // ─── Contract in both currencies ────────────────────────
+  const contractTzs = isUsd ? draft.contract_amount * rate : draft.contract_amount;
+  const contractUsd = isUsd ? draft.contract_amount : draft.contract_amount / rate;
+
+  // ─── Advance: percentage of contract, or fixed in contract currency ───
+  const advanceTzs =
+    draft.advance_input_type === "percentage"
+      ? (contractTzs * draft.advance_value) / 100
+      : isUsd
+        ? draft.advance_value * rate
+        : draft.advance_value;
+
+  const advanceUsd = advanceTzs / rate;
 
   const num = (v: string) => (v === "" ? 0 : Number(v));
 
@@ -79,7 +90,7 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
       draft.contract_amount < 0 ||
       draft.advance_value < 0 ||
       (draft.advance_input_type === "percentage" && draft.advance_value > 100) ||
-      advanceUsd > draft.contract_amount
+      advanceTzs > contractTzs
     ) {
       toast.error(
         "Enter valid amounts, a positive exchange rate, and an advance within the contract value.",
@@ -90,7 +101,7 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
     const { error } = await db.from("trip_financials").upsert(
       {
         trip_id: tripId,
-        contract_currency: "USD",
+        contract_currency: draft.contract_currency,
         contract_amount: draft.contract_amount,
         fx_exchange_rate: draft.fx_exchange_rate,
         advance_input_type: draft.advance_input_type,
@@ -120,7 +131,7 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label className="mb-1.5 block text-sm font-medium">
-              Total contract (USD)
+              Total contract amount
             </Label>
             <Input
               type="number"
@@ -132,6 +143,22 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
               }
             />
           </div>
+          <div>
+            <Label className="mb-1.5 block text-sm font-medium">Currency</Label>
+            <select
+              value={draft.contract_currency}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, contract_currency: e.target.value }))
+              }
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="TZS">TZS</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div>
             <Label className="mb-1.5 block text-sm font-medium">
               FX rate (1 USD = TZS)
@@ -146,10 +173,26 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
               }
             />
           </div>
+          <div className="flex items-end">
+            <p className="text-xs text-muted-foreground">
+              Default rate from Settings. Change only if this trip uses a different rate.
+            </p>
+          </div>
         </div>
-        <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">
-          <span className="text-muted-foreground">Total contract in TZS</span>
-          <strong>{tzs(totalTzs)}</strong>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border bg-card p-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Contract TZS
+            </div>
+            <div className="mt-1 text-lg font-semibold">{tzs(contractTzs)}</div>
+          </div>
+          <div className="rounded-md border bg-card p-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Contract USD
+            </div>
+            <div className="mt-1 text-lg font-semibold">{usd(contractUsd)}</div>
+          </div>
         </div>
       </section>
 
@@ -159,11 +202,10 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
           Driver Cash Advance
         </h3>
 
-        {/* Radio pills */}
         <div className="mb-3 flex flex-wrap gap-5">
           {[
             { value: "percentage", label: "Percentage of contract" },
-            { value: "fixed", label: "Fixed USD amount" },
+            { value: "fixed", label: `Fixed ${draft.contract_currency} amount` },
           ].map((opt) => {
             const active = draft.advance_input_type === opt.value;
             return (
@@ -192,10 +234,11 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
           })}
         </div>
 
-        {/* Advance input */}
         <div className="mb-3">
           <Label className="mb-1.5 block text-sm font-medium">
-            {draft.advance_input_type === "percentage" ? "Advance %" : "Advance USD"}
+            {draft.advance_input_type === "percentage"
+              ? "Advance %"
+              : `Advance (${draft.contract_currency})`}
           </Label>
           <Input
             type="number"
@@ -208,22 +251,21 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
           />
         </div>
 
-        {/* Computed tiles */}
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md border bg-card p-3">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Advance USD
-            </div>
-            <div className="mt-1 text-lg font-semibold text-warning-foreground">
-              {usd(advanceUsd)}
-            </div>
-          </div>
           <div className="rounded-md border bg-card p-3">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Advance TZS
             </div>
             <div className="mt-1 text-lg font-semibold text-warning-foreground">
               {tzs(advanceTzs)}
+            </div>
+          </div>
+          <div className="rounded-md border bg-card p-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Advance USD
+            </div>
+            <div className="mt-1 text-lg font-semibold text-warning-foreground">
+              {usd(advanceUsd)}
             </div>
           </div>
         </div>
