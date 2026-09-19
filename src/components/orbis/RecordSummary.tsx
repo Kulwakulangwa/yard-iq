@@ -6,7 +6,7 @@ import { ArrowLeft, MapPin, Pencil, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { modules, type Field, type ModuleConfig, type RefTable } from "@/lib/modules";
 import { formatValue, humanize } from "@/lib/orbis";
-import { dualDisplay, usd } from "@/lib/money";
+import { dualDisplay } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { StatusBadge } from "./StatusBadge";
 import { TripHeader } from "./TripHeader";
 import { TripSummaryCards } from "./TripSummaryCards";
 import { TripExpensesTable } from "./TripExpensesTable";
+import { TripFuelSection } from "./TripFuelSection";
 import { useRecordEditor, useRefOptions, type Row } from "./RecordEditor";
 
 function useRecord(config: ModuleConfig, recordId: string) {
@@ -30,10 +31,6 @@ function useRecord(config: ModuleConfig, recordId: string) {
   });
 }
 
-/**
- * Money fields whose currency is stored on the record itself.
- * Only applies when the row has a `currency` or `contract_currency` column.
- */
 const CHOSEN_CURRENCY_KEYS = new Set([
   "amount",
   "tax",
@@ -154,6 +151,7 @@ function TripSummary({
 
       <TripSummaryCards finance={finance} expenses={data.expenses} fx={fx} />
 
+      {/* ─── Trucks on this trip ─────────────────────────── */}
       <section className="mt-6">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
           <div className="min-w-0">
@@ -175,6 +173,12 @@ function TripSummary({
         </Card>
       </section>
 
+      {/* ─── Fuel purchases ──────────────────────────────── */}
+      <section className="mt-6">
+        <TripFuelSection tripId={tripId} />
+      </section>
+
+      {/* ─── Expenses + Location history ─────────────────── */}
       <section className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <Card id="trip-audit" className="overflow-hidden scroll-mt-20">
           <div className="border-b px-4 py-3">
