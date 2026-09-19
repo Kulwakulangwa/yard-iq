@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -17,12 +17,26 @@ export function relativeTime(iso: string | null | undefined) {
   return `${Math.round(hours / 24)} d ago`;
 }
 
-type Draft = { location: string; checkpoint: string; reported_by: string; trip_vehicle_id: string; notes: string };
-const empty: Draft = { location: "", checkpoint: "", reported_by: "", trip_vehicle_id: "", notes: "" };
+type Draft = {
+  location: string;
+  checkpoint: string;
+  reported_by: string;
+  trip_vehicle_id: string;
+  notes: string;
+};
+
+const empty: Draft = {
+  location: "",
+  checkpoint: "",
+  reported_by: "",
+  trip_vehicle_id: "",
+  notes: "",
+};
 
 export function TripLocationLog({ tripId }: { tripId: string }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Draft>(empty);
+  const [seeded, setSeeded] = useState(false);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["trip-locations", tripId],
@@ -40,14 +54,44 @@ export function TripLocationLog({ tripId }: { tripId: string }) {
   const { data: convoy = [] } = useQuery({
     queryKey: ["trip-vehicles", tripId],
     queryFn: async () => {
-      const { data, error } = await db.from("trip_vehicles").select("*").eq("trip_id", tripId);
+      const { data, error } = await db
+        .from("trip_vehicles")
+        .select("*")
+        .eq("trip_id", tripId)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as any[];
     },
   });
-  const { data: vehicles = [] } = useQuery({ queryKey: ["vehicles"], queryFn: () => selectAll("vehicles", "id, registration_number") });
+
+  const { data: vehicles = [] } = useQuery({
+    queryKey: ["vehicles"],
+    queryFn: () => selectAll("vehicles", "id, registration_number"),
+  });
+
   const vehicleLabel = (id: unknown) =>
     vehicles.find((v) => String(v.id) === String(id))?.registration_number ?? "Vehicle";
+
+  const firstTruckId = convoy[0]?.id ? String(convoy[0].id) : "";
+
+  // Seed the form with the first truck once convoy loads.
+  useEffect(() => {
+    if (!seeded && firstTruckId) {
+      setDraft((d) => ({ ...d, trip_vehicle_id: firstTruckId }));
+      setSeeded(true);
+    }
+  }, [firstTruckId, seeded]);
+
+  // Reset back to "first truck" default after each save.
+  function resetDraft() {
+    setDraft({
+      location: "",
+      checkpoint: "",
+      reported_by: "",
+      trip_vehicle_id: firstTruckId,
+      notes: "",
+    });
+  }
 
   const report = useMutation({
     mutationFn: async () => {
@@ -74,75 +118,139 @@ export function TripLocationLog({ tripId }: { tripId: string }) {
       if (tripError) throw tripError;
     },
     onSuccess: () => {
-      setDraft(empty);
+      resetDraft();
       qc.invalidateQueries({ queryKey: ["trip-locations", tripId] });
+      qc.invalidateQueries({ queryKey: ["convoy-legs"] });
       qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["office-dashboard"] });
       toast.success("Location updated");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const latest = rows[0];
+  const latestTruck = latest?.trip_vehicle_id
+    ? vehicleLabel(
+        convoy.find((c) => String(c.id) === String(latest.trip_vehicle_id))?.vehicle_id,
+      )
+    : null;
 
   return (
     <section className="border-t pt-4">
       <h2 className="mb-1 font-semibold">Current location</h2>
       <p className="mb-3 text-sm text-muted-foreground">
         {latest
-          ? `${latest.location}${latest.checkpoint ? ` (${latest.checkpoint})` : ""} — reported ${relativeTime(latest.reported_at)}${latest.reported_by ? ` by ${latest.reported_by}` : ""}`
+          ? `${latestTruck ? `${latestTruck} · ` : ""}${latest.location}${latest.checkpoint ? ` (${latest.checkpoint})` : ""} — reported ${relativeTime(latest.reported_at)}${latest.reported_by ? ` by ${latest.reported_by}` : ""}`
           : "No location reported yet."}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <Label htmlFor="tl-location" className="mb-1.5 block text-xs text-muted-foreground">Location</Label>
-          <Input id="tl-location" value={draft.location} onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))} />
+          <Label htmlFor="tl-location" className="mb-1.5 block text-xs text-muted-foreground">
+            Location
+          </Label>
+          <Input
+            id="tl-location"
+            value={draft.location}
+            onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))}
+          />
         </div>
         <div>
-          <Label htmlFor="tl-checkpoint" className="mb-1.5 block text-xs text-muted-foreground">Checkpoint / border</Label>
-          <Input id="tl-checkpoint" value={draft.checkpoint} onChange={(e) => setDraft((d) => ({ ...d, checkpoint: e.target.value }))} />
+          <Label htmlFor="tl-checkpoint" className="mb-1.5 block text-xs text-muted-foreground">
+            Checkpoint / border
+          </Label>
+          <Input
+            id="tl-checkpoint"
+            value={draft.checkpoint}
+            onChange={(e) => setDraft((d) => ({ ...d, checkpoint: e.target.value }))}
+          />
         </div>
         <div>
-          <Label htmlFor="tl-officer" className="mb-1.5 block text-xs text-muted-foreground">Reported by</Label>
-          <Input id="tl-officer" value={draft.reported_by} onChange={(e) => setDraft((d) => ({ ...d, reported_by: e.target.value }))} />
+          <Label htmlFor="tl-officer" className="mb-1.5 block text-xs text-muted-foreground">
+            Reported by
+          </Label>
+          <Input
+            id="tl-officer"
+            value={draft.reported_by}
+            onChange={(e) => setDraft((d) => ({ ...d, reported_by: e.target.value }))}
+          />
         </div>
         <div>
-          <Label htmlFor="tl-vehicle" className="mb-1.5 block text-xs text-muted-foreground">Vehicle (bundle trips)</Label>
+          <Label htmlFor="tl-vehicle" className="mb-1.5 block text-xs text-muted-foreground">
+            Which truck is reporting?
+          </Label>
           <select
             id="tl-vehicle"
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             value={draft.trip_vehicle_id}
             onChange={(e) => setDraft((d) => ({ ...d, trip_vehicle_id: e.target.value }))}
           >
-            <option value="">Whole trip</option>
+            <option value="">Whole trip (all trucks)</option>
             {convoy.map((c) => (
-              <option key={c.id} value={c.id}>{vehicleLabel(c.vehicle_id)}</option>
+              <option key={c.id} value={c.id}>
+                {vehicleLabel(c.vehicle_id)}
+              </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {convoy.length > 1
+              ? `Each truck can be at a different place — pick the one reporting. Use "Whole trip" only when they moved together.`
+              : convoy.length === 1
+                ? "The trip has one truck — this records against it."
+                : "No trucks assigned to this trip yet."}
+          </p>
         </div>
         <div className="sm:col-span-2">
-          <Label htmlFor="tl-notes" className="mb-1.5 block text-xs text-muted-foreground">Note</Label>
-          <Input id="tl-notes" value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} />
+          <Label htmlFor="tl-notes" className="mb-1.5 block text-xs text-muted-foreground">
+            Note
+          </Label>
+          <Input
+            id="tl-notes"
+            value={draft.notes}
+            onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+          />
         </div>
       </div>
-      <Button className="mt-3" variant="outline" onClick={() => report.mutate()} disabled={report.isPending}>
+      <Button
+        className="mt-3"
+        variant="outline"
+        onClick={() => report.mutate()}
+        disabled={report.isPending}
+      >
         {report.isPending ? "Saving…" : "Record location update"}
       </Button>
 
       {isLoading ? null : rows.length > 0 ? (
         <ul className="mt-4 divide-y rounded-md border text-sm">
-          {rows.map((r) => (
-            <li key={r.id} className="px-3 py-2">
-              <span className="font-medium">{r.location}</span>
-              {r.checkpoint ? ` · ${r.checkpoint}` : ""}
-              {r.trip_vehicle_id ? ` · ${vehicleLabel(convoy.find((c) => c.id === r.trip_vehicle_id)?.vehicle_id)}` : ""}
-              <span className="ml-2 text-muted-foreground">
-                {relativeTime(r.reported_at)}
-                {r.reported_by ? ` · ${r.reported_by}` : ""}
-              </span>
-              {r.notes ? <p className="text-muted-foreground">{r.notes}</p> : null}
-            </li>
-          ))}
+          {rows.map((r) => {
+            const leg = convoy.find((c) => String(c.id) === String(r.trip_vehicle_id));
+            return (
+              <li key={r.id} className="px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {r.trip_vehicle_id && leg ? (
+                    <span className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                      {vehicleLabel(leg.vehicle_id)}
+                    </span>
+                  ) : (
+                    <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      Whole trip
+                    </span>
+                  )}
+                  <span className="font-medium">{r.location}</span>
+                  {r.checkpoint ? (
+                    <span className="text-muted-foreground">· {r.checkpoint}</span>
+                  ) : null}
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {relativeTime(r.reported_at)}
+                    {r.reported_by ? ` · ${r.reported_by}` : ""}
+                  </span>
+                </div>
+                {r.notes ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{r.notes}</p>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>
