@@ -4,9 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin, Pencil, Plus } from "lucide-react";
 
 import { db } from "@/lib/db";
-import { modules, type Field, type ModuleConfig, type RefTable } from "@/lib/modules";
+import { modules, type ModuleConfig, type RefTable } from "@/lib/modules";
 import { formatValue, humanize } from "@/lib/orbis";
-import { dualDisplay } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,7 +16,6 @@ import { StatusBadge } from "./StatusBadge";
 import { TripHeader } from "./TripHeader";
 import { TripSummaryCards } from "./TripSummaryCards";
 import { TripExpensesTable } from "./TripExpensesTable";
-import { TripFuelSection } from "./TripFuelSection";
 import { useRecordEditor, useRefOptions, type Row } from "./RecordEditor";
 
 function useRecord(config: ModuleConfig, recordId: string) {
@@ -29,61 +27,6 @@ function useRecord(config: ModuleConfig, recordId: string) {
       return (data ?? null) as Row | null;
     },
   });
-}
-
-const CHOSEN_CURRENCY_KEYS = new Set([
-  "amount",
-  "tax",
-  "fuel_cost",
-  "contract_amount",
-  "cost",
-]);
-
-function moneyMode(key: string, row: Row): "chosen" | "tzs" | null {
-  if (CHOSEN_CURRENCY_KEYS.has(key) && ("currency" in row || "contract_currency" in row)) {
-    return "chosen";
-  }
-  if (key.endsWith("_tzs")) return "tzs";
-  return null;
-}
-
-function MoneyValue({ amount, currency, fx }: { amount: number; currency: string; fx: number }) {
-  const display = dualDisplay(amount, currency, fx);
-  return (
-    <div className="leading-tight">
-      <div className="font-medium">{display.primary}</div>
-      <div className="text-xs font-normal text-muted-foreground">{display.secondary}</div>
-    </div>
-  );
-}
-
-function FieldValue({
-  field,
-  row,
-  config,
-  fx,
-  refLabel,
-}: {
-  field: Field;
-  row: Row;
-  config: ModuleConfig;
-  fx: number;
-  refLabel: (table: RefTable | undefined, id: unknown) => string;
-}) {
-  if (field.type === "ref") return <>{refLabel(field.refTable, row[field.key])}</>;
-  if (field.key === config.statusKey) return <StatusBadge value={String(row[field.key] ?? "")} />;
-
-  const mode = moneyMode(field.key, row);
-  if (mode && field.type === "number") {
-    const amount = Number(row[field.key] ?? 0);
-    const currency =
-      mode === "tzs"
-        ? "TZS"
-        : String(row["currency"] ?? row["contract_currency"] ?? "TZS");
-    return <MoneyValue amount={amount} currency={currency} fx={fx} />;
-  }
-
-  return <>{formatValue(row[field.key])}</>;
 }
 
 function TripSummary({
@@ -99,6 +42,23 @@ function TripSummary({
   const fx = useFxRate();
   const { data: convoy } = useConvoyLegs();
   const legs = convoy?.get(tripId) ?? [];
+
+  // Raw trip_vehicles rows — needed for contract/advance/fuel sums,
+  // since ConvoyLeg (above) doesn't carry those financial fields.
+  const { data: trucks = [] } = useQuery({
+    queryKey: ["trip-vehicles-financial", tripId],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("trip_vehicles")
+        .select(
+          "id, vehicle_id, trailer_id, driver_id, role, contract_amount, advance_paid_usd, advance_paid_tzs, fuel_budget_litres, fuel_budget_cost",
+        )
+        .eq("trip_id", tripId);
+      if (error) throw error;
+      return (data ?? []) as Row[];
+    },
+  });
+
   const { data = { finance: null as Row | null, expenses: [] as Row[], locations: [] as Row[] } } = useQuery({
     queryKey: ["trip-summary", tripId],
     queryFn: async () => {
@@ -110,7 +70,11 @@ function TripSummary({
       if (finance.error) throw finance.error;
       if (expenses.error) throw expenses.error;
       if (locations.error) throw locations.error;
-      return { finance: finance.data as Row | null, expenses: (expenses.data ?? []) as Row[], locations: (locations.data ?? []) as Row[] };
+      return {
+        finance: finance.data as Row | null,
+        expenses: (expenses.data ?? []) as Row[],
+        locations: (locations.data ?? []) as Row[],
+      };
     },
   });
   const finance = data.finance;
@@ -149,9 +113,13 @@ function TripSummary({
         }
       />
 
-      <TripSummaryCards finance={finance} expenses={data.expenses} fx={fx} />
+      <TripSummaryCards
+        finance={finance}
+        expenses={data.expenses}
+        trucks={trucks}
+        fx={fx}
+      />
 
-      {/* ─── Trucks on this trip ─────────────────────────── */}
       <section className="mt-6">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
           <div className="min-w-0">
@@ -173,12 +141,6 @@ function TripSummary({
         </Card>
       </section>
 
-      {/* ─── Fuel purchases ──────────────────────────────── */}
-      <section className="mt-6">
-        <TripFuelSection tripId={tripId} />
-      </section>
-
-      {/* ─── Expenses + Location history ─────────────────── */}
       <section className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <Card id="trip-audit" className="overflow-hidden scroll-mt-20">
           <div className="border-b px-4 py-3">
@@ -230,7 +192,6 @@ function TripSummary({
 export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig; recordId: string; slug: string }) {
   const { data: row, isLoading, error } = useRecord(config, recordId);
   const { data: refs = {} } = useRefOptions(config.fields);
-  const fx = useFxRate();
   const editor = useRecordEditor(config, row ? [row] : []);
   const titleKey = config.prefixKey ?? config.columns[0] ?? "id";
   const refLabel = (table: RefTable | undefined, id: unknown) =>
@@ -304,8 +265,14 @@ export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                 {field.label ?? humanize(field.key)}
               </dt>
-              <dd className="mt-1 break-words text-sm">
-                <FieldValue field={field} row={row} config={config} fx={fx} refLabel={refLabel} />
+              <dd className="mt-1 break-words text-sm font-medium">
+                {field.type === "ref" ? (
+                  refLabel(field.refTable, row[field.key])
+                ) : field.key === config.statusKey ? (
+                  <StatusBadge value={String(row[field.key] ?? "")} />
+                ) : (
+                  formatValue(row[field.key])
+                )}
               </dd>
             </div>
           ))}
