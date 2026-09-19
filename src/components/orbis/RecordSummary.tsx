@@ -4,8 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin, Pencil, Plus } from "lucide-react";
 
 import { db } from "@/lib/db";
-import { modules, type ModuleConfig, type RefTable } from "@/lib/modules";
+import { modules, type Field, type ModuleConfig, type RefTable } from "@/lib/modules";
 import { formatValue, humanize } from "@/lib/orbis";
+import { dualDisplay, usd } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,6 +28,65 @@ function useRecord(config: ModuleConfig, recordId: string) {
       return (data ?? null) as Row | null;
     },
   });
+}
+
+/**
+ * Money fields whose currency is stored on the record itself.
+ * Only applies when the row has a `currency` or `contract_currency` column.
+ */
+const CHOSEN_CURRENCY_KEYS = new Set([
+  "amount",
+  "tax",
+  "fuel_cost",
+  "contract_amount",
+  "cost",
+]);
+
+function moneyMode(key: string, row: Row): "chosen" | "tzs" | null {
+  if (CHOSEN_CURRENCY_KEYS.has(key) && ("currency" in row || "contract_currency" in row)) {
+    return "chosen";
+  }
+  if (key.endsWith("_tzs")) return "tzs";
+  return null;
+}
+
+function MoneyValue({ amount, currency, fx }: { amount: number; currency: string; fx: number }) {
+  const display = dualDisplay(amount, currency, fx);
+  return (
+    <div className="leading-tight">
+      <div className="font-medium">{display.primary}</div>
+      <div className="text-xs font-normal text-muted-foreground">{display.secondary}</div>
+    </div>
+  );
+}
+
+function FieldValue({
+  field,
+  row,
+  config,
+  fx,
+  refLabel,
+}: {
+  field: Field;
+  row: Row;
+  config: ModuleConfig;
+  fx: number;
+  refLabel: (table: RefTable | undefined, id: unknown) => string;
+}) {
+  if (field.type === "ref") return <>{refLabel(field.refTable, row[field.key])}</>;
+  if (field.key === config.statusKey) return <StatusBadge value={String(row[field.key] ?? "")} />;
+
+  const mode = moneyMode(field.key, row);
+  if (mode && field.type === "number") {
+    const amount = Number(row[field.key] ?? 0);
+    const currency =
+      mode === "tzs"
+        ? "TZS"
+        : String(row["currency"] ?? row["contract_currency"] ?? "TZS");
+    return <MoneyValue amount={amount} currency={currency} fx={fx} />;
+  }
+
+  return <>{formatValue(row[field.key])}</>;
 }
 
 function TripSummary({
@@ -166,6 +226,7 @@ function TripSummary({
 export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig; recordId: string; slug: string }) {
   const { data: row, isLoading, error } = useRecord(config, recordId);
   const { data: refs = {} } = useRefOptions(config.fields);
+  const fx = useFxRate();
   const editor = useRecordEditor(config, row ? [row] : []);
   const titleKey = config.prefixKey ?? config.columns[0] ?? "id";
   const refLabel = (table: RefTable | undefined, id: unknown) =>
@@ -239,14 +300,8 @@ export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                 {field.label ?? humanize(field.key)}
               </dt>
-              <dd className="mt-1 break-words text-sm font-medium">
-                {field.type === "ref" ? (
-                  refLabel(field.refTable, row[field.key])
-                ) : field.key === config.statusKey ? (
-                  <StatusBadge value={String(row[field.key] ?? "")} />
-                ) : (
-                  formatValue(row[field.key])
-                )}
+              <dd className="mt-1 break-words text-sm">
+                <FieldValue field={field} row={row} config={config} fx={fx} refLabel={refLabel} />
               </dd>
             </div>
           ))}
