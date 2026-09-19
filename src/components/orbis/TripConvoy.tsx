@@ -17,6 +17,8 @@ type Draft = {
   contract_amount: string;
   advance_paid_usd: string;
   advance_paid_tzs: string;
+  fuel_budget_litres: string;
+  fuel_budget_cost: string;
   notes: string;
 };
 
@@ -28,6 +30,8 @@ const empty: Draft = {
   contract_amount: "",
   advance_paid_usd: "",
   advance_paid_tzs: "",
+  fuel_budget_litres: "",
+  fuel_budget_cost: "",
   notes: "",
 };
 
@@ -76,6 +80,8 @@ export function TripConvoy({ tripId }: { tripId: string }) {
         contract_currency: "USD",
         advance_paid_usd: Number(draft.advance_paid_usd || 0),
         advance_paid_tzs: Number(draft.advance_paid_tzs || 0),
+        fuel_budget_litres: Number(draft.fuel_budget_litres || 0),
+        fuel_budget_cost: Number(draft.fuel_budget_cost || 0),
         notes: draft.notes || null,
       });
       if (error) throw error;
@@ -110,12 +116,14 @@ export function TripConvoy({ tripId }: { tripId: string }) {
     (s, r) => s + Number(r.advance_paid_tzs ?? 0) + Number(r.advance_paid_usd ?? 0) * 2600,
     0,
   );
+  const totalFuelLitres = rows.reduce((s, r) => s + Number(r.fuel_budget_litres ?? 0), 0);
+  const totalFuelCost = rows.reduce((s, r) => s + Number(r.fuel_budget_cost ?? 0), 0);
 
   return (
     <section className="border-t pt-4">
       <h2 className="mb-1 font-semibold">Trucks on this trip</h2>
       <p className="mb-3 text-sm text-muted-foreground">
-        One row per truck, each with its own driver, trailer and advance.
+        One row per truck, each with its own driver, trailer, contract and fuel budget.
       </p>
 
       {isLoading ? (
@@ -153,6 +161,13 @@ export function TripConvoy({ tripId }: { tripId: string }) {
                       <span>
                         Advance TZS <strong>{tzs(r.advance_paid_tzs)}</strong>
                       </span>
+                      <span>
+                        Fuel{" "}
+                        <strong>
+                          {Number(r.fuel_budget_litres ?? 0).toLocaleString()} L ·{" "}
+                          {tzs(r.fuel_budget_cost)}
+                        </strong>
+                      </span>
                     </div>
                     {r.notes ? (
                       <div className="mt-1 text-xs text-muted-foreground">{r.notes}</div>
@@ -169,18 +184,24 @@ export function TripConvoy({ tripId }: { tripId: string }) {
               </li>
             ))}
           </ul>
-          <div className="mb-3 grid gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm sm:grid-cols-3">
+          <div className="mb-3 grid gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
             <div>
               <span className="text-muted-foreground">Trucks: </span>
               <strong>{rows.length}</strong>
             </div>
             <div>
-              <span className="text-muted-foreground">Combined contract: </span>
+              <span className="text-muted-foreground">Contract: </span>
               <strong>{usd(totalContractUsd)}</strong>
             </div>
             <div>
-              <span className="text-muted-foreground">Combined advance: </span>
+              <span className="text-muted-foreground">Advance: </span>
               <strong>{tzs(totalAdvanceTzs)}</strong>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Fuel budget: </span>
+              <strong>
+                {totalFuelLitres.toLocaleString()} L · {tzs(totalFuelCost)}
+              </strong>
             </div>
           </div>
         </>
@@ -295,6 +316,32 @@ export function TripConvoy({ tripId }: { tripId: string }) {
             step="any"
             value={draft.advance_paid_tzs}
             onChange={(e) => setDraft((d) => ({ ...d, advance_paid_tzs: e.target.value }))}
+          />
+        </div>
+        <div>
+          <Label htmlFor="tv-fuel-l" className="mb-1.5 block text-xs text-muted-foreground">
+            Fuel budget (litres)
+          </Label>
+          <Input
+            id="tv-fuel-l"
+            type="number"
+            min="0"
+            step="any"
+            value={draft.fuel_budget_litres}
+            onChange={(e) => setDraft((d) => ({ ...d, fuel_budget_litres: e.target.value }))}
+          />
+        </div>
+        <div>
+          <Label htmlFor="tv-fuel-cost" className="mb-1.5 block text-xs text-muted-foreground">
+            Fuel budget (TZS)
+          </Label>
+          <Input
+            id="tv-fuel-cost"
+            type="number"
+            min="0"
+            step="any"
+            value={draft.fuel_budget_cost}
+            onChange={(e) => setDraft((d) => ({ ...d, fuel_budget_cost: e.target.value }))}
           />
         </div>
         <div className="sm:col-span-2">
