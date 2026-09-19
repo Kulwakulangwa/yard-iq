@@ -1,5 +1,7 @@
 import { createFileRoute, Outlet, useLocation, useParams } from "@tanstack/react-router";
 import { DataModule } from "@/components/orbis/DataModule";
+import { ExpensesPage } from "@/components/orbis/ExpensesPage";
+import { FuelManagementPage } from "@/components/orbis/FuelManagementPage";
 import { modules } from "@/lib/modules";
 import { moduleSlugs } from "@/lib/nav";
 
@@ -26,6 +28,10 @@ function ModulePage() {
   // /m/trips/<id>   → 3 segments → render the child (detail) route
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length > 2) return <Outlet />;
+
+  // Custom pages for specific modules
+  if (config.table === "expenses") return <ExpensesPage />;
+  if (config.table === "fuel_allocations") return <FuelManagementPage />;
 
   return <DataModule config={config} />;
 }
