@@ -21,15 +21,17 @@ export const Route = createFileRoute("/_authenticated/zones")({
 
 const db = supabase as never as { from: (t: string) => any };
 
+const IN_YARD_STATUSES = ["In Yard", "Loading", "On Hold", "In Maintenance"];
+
 function Zones() {
   const qc = useQueryClient();
 
-  const [moving, setMoving] = useState<any | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
   const [toZone, setToZone] = useState("");
   const [reason, setReason] = useState("");
 
-  const [coupling, setCoupling] = useState<any | null>(null);
-  const [coupleTrailer, setCoupleTrailer] = useState("");
+  const [couplingId, setCouplingId] = useState<string | null>(null);
+  const [coupleTrailerId, setCoupleTrailerId] = useState("");
 
   const { data } = useQuery({
     queryKey: ["yard-board"],
@@ -48,24 +50,23 @@ function Zones() {
   });
 
   const move = useMutation({
-    mutationFn: async () => {
-      if (!moving || !toZone) throw new Error("Choose a zone");
+    mutationFn: async (vars: { vehicleId: string; fromZone: string | null; toZone: string; reason: string }) => {
       const { error } = await db.from("yard_movements").insert({
-        vehicle_id: moving.id,
-        from_zone: moving.yard_zone ?? null,
-        to_zone: toZone,
-        reason: reason || null,
+        vehicle_id: vars.vehicleId,
+        from_zone: vars.fromZone,
+        to_zone: vars.toZone,
+        reason: vars.reason || null,
         moved_at: new Date().toISOString(),
       });
       if (error) throw error;
-      const up = await db.from("vehicles").update({ yard_zone: toZone }).eq("id", moving.id);
+      const up = await db.from("vehicles").update({ yard_zone: vars.toZone }).eq("id", vars.vehicleId);
       if (up.error) throw up.error;
-      await logAudit("yard_move", "vehicles", moving.id, { from: moving.yard_zone, to: toZone });
+      await logAudit("yard_move", "vehicles", vars.vehicleId, { from: vars.fromZone, to: vars.toZone });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["yard-board"] });
       qc.invalidateQueries({ queryKey: ["yard-dashboard"] });
-      setMoving(null);
+      setMovingId(null);
       setToZone("");
       setReason("");
       toast.success("Vehicle moved");
@@ -74,20 +75,19 @@ function Zones() {
   });
 
   const couple = useMutation({
-    mutationFn: async () => {
-      if (!coupling || !coupleTrailer) throw new Error("Choose a trailer");
+    mutationFn: async (vars: { truckId: string; trailerId: string }) => {
       const { error } = await supabase.rpc("couple_vehicles", {
-        truck_id: coupling.id,
-        trailer_id: coupleTrailer,
+        truck_id: vars.truckId,
+        trailer_id: vars.trailerId,
       });
       if (error) throw error;
-      await logAudit("couple", "vehicles", coupling.id, { trailer_id: coupleTrailer });
+      await logAudit("couple", "vehicles", vars.truckId, { trailer_id: vars.trailerId });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["yard-board"] });
       qc.invalidateQueries({ queryKey: ["yard-dashboard"] });
-      setCoupling(null);
-      setCoupleTrailer("");
+      setCouplingId(null);
+      setCoupleTrailerId("");
       toast.success("Vehicles coupled");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -115,179 +115,168 @@ function Zones() {
     return byId.get(String(v.coupled_to_id))?.registration_number ?? null;
   };
 
-  // Trailers that are free (uncoupled) and in a yard status — eligible for coupling
+  const moving = movingId ? byId.get(movingId) ?? null : null;
+  const coupling = couplingId ? byId.get(couplingId) ?? null : null;
+
   const freeTrailers = vehicles.filter(
     (v) => v.is_trailer && !v.coupled_to_id && v.status !== "On Trip",
   );
+
+  // Vehicles physically in the yard but without a zone assigned
+  const unassigned = vehicles.filter(
+    (v) => !v.yard_zone && IN_YARD_STATUSES.includes(String(v.status)),
+  );
+
+  function renderVehicleBlock(v: any) {
+    const partner = partnerLabel(v);
+    const isCoupled = Boolean(v.coupled_to_id);
+    return (
+      <li key={v.id} className="rounded-md border p-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="text-sm font-medium">{v.registration_number}</span>
+            {partner ? (
+              <span className="inline-flex items-center gap-0.5 text-xs text-primary">
+                <Link2 className="size-3" />
+                {partner}
+              </span>
+            ) : v.is_trailer ? (
+              <span className="text-xs text-muted-foreground">free</span>
+            ) : null}
+          </div>
+          <StatusBadge value={v.status} />
+        </div>
+        <div className="mt-2 flex gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => {
+              setMovingId(String(v.id));
+              setToZone("");
+            }}
+          >
+            Move zone
+          </Button>
+          {isCoupled ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => uncouple.mutate(String(v.id))}
+              disabled={uncouple.isPending}
+            >
+              <Unlink className="size-4" /> Uncouple
+            </Button>
+          ) : !v.is_trailer ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setCouplingId(String(v.id));
+                setCoupleTrailerId("");
+              }}
+            >
+              <Link2 className="size-4" /> Couple
+            </Button>
+          ) : null}
+        </div>
+      </li>
+    );
+  }
 
   return (
     <>
       <PageHeader title="Yard Zones" subtitle="Live board of where every vehicle is standing" />
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {zones.map((z) => {
-          const here = vehicles.filter((v) => v.yard_zone === z.name);
-          const trucksHere = here.filter((v) => !v.is_trailer);
-          const trailersHere = here.filter((v) => v.is_trailer);
-
-          return (
-            <Card key={z.id} className="p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="font-semibold">{z.name}</h2>
-                <span className="text-xs text-muted-foreground">
-                  {here.length}
-                  {z.capacity ? ` / ${z.capacity}` : ""}
-                </span>
-              </div>
-
-              {here.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Empty</p>
-              ) : (
-                <div className="space-y-3">
-                  {trucksHere.length > 0 ? (
-                    <div>
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Trucks
-                      </p>
-                      <ul className="space-y-2">
-                        {trucksHere.map((v) => {
-                          const partner = partnerLabel(v);
-                          const isCoupled = Boolean(v.coupled_to_id);
-                          return (
-                            <li key={v.id} className="rounded-md border p-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <span className="text-sm font-medium">{v.registration_number}</span>
-                                  {partner ? (
-                                    <span className="inline-flex items-center gap-0.5 text-xs text-primary">
-                                      <Link2 className="size-3" />
-                                      {partner}
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <StatusBadge value={v.status} />
-                              </div>
-                              <div className="mt-2 flex gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() => {
-                                    setMoving(v);
-                                    setToZone("");
-                                  }}
-                                >
-                                  Move zone
-                                </Button>
-                                {isCoupled ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => uncouple.mutate(String(v.id))}
-                                    disabled={uncouple.isPending}
-                                  >
-                                    <Unlink className="size-4" /> Uncouple
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setCoupling(v);
-                                      setCoupleTrailer("");
-                                    }}
-                                  >
-                                    <Link2 className="size-4" /> Couple
-                                  </Button>
-                                )}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ) : null}
-
-                  {trailersHere.length > 0 ? (
-                    <div>
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Trailers
-                      </p>
-                      <ul className="space-y-2">
-                        {trailersHere.map((v) => {
-                          const partner = partnerLabel(v);
-                          return (
-                            <li key={v.id} className="rounded-md border p-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <span className="text-sm font-medium">{v.registration_number}</span>
-                                  {partner ? (
-                                    <span className="inline-flex items-center gap-0.5 text-xs text-primary">
-                                      <Link2 className="size-3" />
-                                      {partner}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">free</span>
-                                  )}
-                                </div>
-                                <StatusBadge value={v.status} />
-                              </div>
-                              <div className="mt-2 flex gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() => {
-                                    setMoving(v);
-                                    setToZone("");
-                                  }}
-                                >
-                                  Move zone
-                                </Button>
-                                {partner ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => uncouple.mutate(String(v.id))}
-                                    disabled={uncouple.isPending}
-                                  >
-                                    <Unlink className="size-4" /> Uncouple
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ) : null}
+      {zones.length === 0 ? (
+        <Card className="p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            No zones configured yet. Run the seed SQL to create the seven default zones
+            (Main Gate, Parking, Loading Bay, Unloading Bay, Workshop, Tire Store, Exit Gate).
+          </p>
+        </Card>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {zones.map((z) => {
+            const here = vehicles.filter((v) => v.yard_zone === z.name);
+            const trucksHere = here.filter((v) => !v.is_trailer);
+            const trailersHere = here.filter((v) => v.is_trailer);
+            return (
+              <Card key={z.id} className="p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="font-semibold">{z.name}</h2>
+                  <span className="text-xs text-muted-foreground">
+                    {here.length}
+                    {z.capacity ? ` / ${z.capacity}` : ""}
+                  </span>
                 </div>
-              )}
+
+                {here.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Empty</p>
+                ) : (
+                  <div className="space-y-3">
+                    {trucksHere.length > 0 ? (
+                      <div>
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Trucks
+                        </p>
+                        <ul className="space-y-2">{trucksHere.map(renderVehicleBlock)}</ul>
+                      </div>
+                    ) : null}
+                    {trailersHere.length > 0 ? (
+                      <div>
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Trailers
+                        </p>
+                        <ul className="space-y-2">{trailersHere.map(renderVehicleBlock)}</ul>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+
+          {/* Unassigned — vehicles physically in yard but no zone set */}
+          {unassigned.length > 0 ? (
+            <Card className="border-warning/40 bg-warning/5 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="font-semibold">Unassigned</h2>
+                <span className="text-xs text-muted-foreground">{unassigned.length}</span>
+              </div>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Vehicles in the yard with no zone set. Use Move zone to place them.
+              </p>
+              <ul className="space-y-2">{unassigned.map(renderVehicleBlock)}</ul>
             </Card>
-          );
-        })}
-      </div>
+          ) : null}
+        </div>
+      )}
 
       <Card className="mt-5 p-4">
         <h2 className="mb-3 font-semibold">Recent movements</h2>
-        <ul className="divide-y text-sm">
-          {(data?.moves ?? []).map((m) => {
-            const v = vehicles.find((x) => x.id === m.vehicle_id);
-            return (
-              <li key={m.id} className="flex flex-wrap items-center gap-2 py-2">
-                <span className="font-medium">{v?.registration_number ?? "—"}</span>
-                <span className="text-muted-foreground">
-                  {m.from_zone ?? "Outside"} → {m.to_zone}
-                </span>
-                <span className="ml-auto text-xs text-muted-foreground">{formatValue(m.moved_at)}</span>
-              </li>
-            );
-          })}
-        </ul>
+        {data?.moves?.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No movements recorded yet.</p>
+        ) : (
+          <ul className="divide-y text-sm">
+            {(data?.moves ?? []).map((m) => {
+              const v = vehicles.find((x) => x.id === m.vehicle_id);
+              return (
+                <li key={m.id} className="flex flex-wrap items-center gap-2 py-2">
+                  <span className="font-medium">{v?.registration_number ?? "—"}</span>
+                  <span className="text-muted-foreground">
+                    {m.from_zone ?? "Outside"} → {m.to_zone}
+                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">{formatValue(m.moved_at)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Card>
 
-      {/* ── Move zone dialog ── */}
-      <Dialog open={!!moving} onOpenChange={(o) => !o && setMoving(null)}>
+      {/* Move zone dialog */}
+      <Dialog open={!!moving} onOpenChange={(o) => !o && setMovingId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Move {moving?.registration_number}</DialogTitle>
@@ -314,15 +303,26 @@ function Zones() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => move.mutate()} disabled={move.isPending}>
+            <Button
+              onClick={() =>
+                moving &&
+                move.mutate({
+                  vehicleId: String(moving.id),
+                  fromZone: moving.yard_zone ?? null,
+                  toZone,
+                  reason,
+                })
+              }
+              disabled={move.isPending || !toZone}
+            >
               Save movement
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Couple dialog ── */}
-      <Dialog open={!!coupling} onOpenChange={(o) => !o && setCoupling(null)}>
+      {/* Couple dialog */}
+      <Dialog open={!!coupling} onOpenChange={(o) => !o && setCouplingId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Couple {coupling?.registration_number}</DialogTitle>
@@ -331,8 +331,8 @@ function Zones() {
             <div>
               <Label className="mb-1.5 block text-xs text-muted-foreground">Trailer</Label>
               <select
-                value={coupleTrailer}
-                onChange={(e) => setCoupleTrailer(e.target.value)}
+                value={coupleTrailerId}
+                onChange={(e) => setCoupleTrailerId(e.target.value)}
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="">—</option>
@@ -355,7 +355,16 @@ function Zones() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => couple.mutate()} disabled={couple.isPending || !coupleTrailer}>
+            <Button
+              onClick={() =>
+                coupling &&
+                couple.mutate({
+                  truckId: String(coupling.id),
+                  trailerId: coupleTrailerId,
+                })
+              }
+              disabled={couple.isPending || !coupleTrailerId}
+            >
               Couple
             </Button>
           </DialogFooter>
