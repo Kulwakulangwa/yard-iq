@@ -106,8 +106,17 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   });
 
   function openNew(defaults: Row = {}) {
+    // Defensive: React calls onClick handlers with the click event as the
+    // first argument. When used as `<Button onClick={openNew}>`, `defaults`
+    // receives the event object — which carries DOM references that
+    // JSON.stringify chokes on. Treat it as "no defaults".
+    const isEvent =
+      defaults &&
+      typeof defaults === "object" &&
+      ("nativeEvent" in defaults || "currentTarget" in defaults);
+    const safeDefaults: Row = isEvent ? {} : defaults;
     setEditingId(null);
-    setDraft(defaults);
+    setDraft(safeDefaults);
     setOpen(true);
   }
 
