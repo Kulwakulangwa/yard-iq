@@ -1,10 +1,11 @@
-import { useState } from "react";
+\import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { db, selectAll } from "@/lib/db";
 import { tzs, usd } from "@/lib/money";
+import { useAvailability } from "@/lib/availability";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,7 @@ const empty: Draft = {
 export function TripConvoy({ tripId }: { tripId: string }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Draft>(empty);
+  const availability = useAvailability({ excludeTripId: tripId });
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["trip-vehicles", tripId],
@@ -92,6 +94,7 @@ export function TripConvoy({ tripId }: { tripId: string }) {
       qc.invalidateQueries({ queryKey: ["trip-summary", tripId] });
       qc.invalidateQueries({ queryKey: ["convoy-legs"] });
       qc.invalidateQueries({ queryKey: ["fleet-overview"] });
+      qc.invalidateQueries({ queryKey: ["availability"] });
       toast.success("Truck added to the trip");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -107,9 +110,44 @@ export function TripConvoy({ tripId }: { tripId: string }) {
       qc.invalidateQueries({ queryKey: ["trip-summary", tripId] });
       qc.invalidateQueries({ queryKey: ["convoy-legs"] });
       qc.invalidateQueries({ queryKey: ["fleet-overview"] });
+      qc.invalidateQueries({ queryKey: ["availability"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  /** Driver → assigned truck → coupled trailer cascade. */
+  function pickDriver(driverId: string) {
+    setDraft((d) => {
+      const next: Draft = { ...d, driver_id: driverId };
+      if (driverId && !next.vehicle_id) {
+        const assigned = availability.truckByDriver.get(driverId);
+        if (assigned && !availability.busyTruckIds.has(assigned)) {
+          next.vehicle_id = assigned;
+          if (!next.trailer_id) {
+            const coupled = availability.trailerByTruck.get(assigned);
+            if (coupled && !availability.busyTrailerIds.has(coupled)) {
+              next.trailer_id = coupled;
+            }
+          }
+        }
+      }
+      return next;
+    });
+  }
+
+  /** Truck → coupled trailer cascade. */
+  function pickTruck(vehicleId: string) {
+    setDraft((d) => {
+      const next: Draft = { ...d, vehicle_id: vehicleId };
+      if (vehicleId) {
+        const coupled = availability.trailerByTruck.get(vehicleId);
+        if (coupled && !availability.busyTrailerIds.has(coupled)) {
+          next.trailer_id = coupled;
+        }
+      }
+      return next;
+    });
+  }
 
   const totalContractUsd = rows.reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
   const totalAdvanceTzs = rows.reduce(
@@ -173,11 +211,7 @@ export function TripConvoy({ tripId }: { tripId: string }) {
                       <div className="mt-1 text-xs text-muted-foreground">{r.notes}</div>
                     ) : null}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => remove.mutate(String(r.id))}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => remove.mutate(String(r.id))}>
                     <Trash2 className="size-4" />
                   </Button>
                 </div>
@@ -198,7 +232,7 @@ export function TripConvoy({ tripId }: { tripId: string }) {
               <strong>{tzs(totalAdvanceTzs)}</strong>
             </div>
             <div>
-              <span className="text-muted-foreground">Fuel budget: </span>
+              <span className="text-muted-foreground">Fuel: </span>
               <strong>
                 {totalFuelLitres.toLocaleString()} L · {tzs(totalFuelCost)}
               </strong>
@@ -216,14 +250,19 @@ export function TripConvoy({ tripId }: { tripId: string }) {
             id="tv-vehicle"
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             value={draft.vehicle_id}
-            onChange={(e) => setDraft((d) => ({ ...d, vehicle_id: e.target.value }))}
+            onChange={(e) => pickTruck(e.target.value)}
           >
             <option value="">—</option>
-            {trucks.map((v: any) => (
-              <option key={v.id} value={v.id}>
-                {v.registration_number}
-              </option>
-            ))}
+            {trucks.map((v: any) => {
+              const busy = availability.busyTruckIds.has(String(v.id));
+              const reason = availability.busyReasonByVehicleId.get(String(v.id));
+              return (
+                <option key={v.id} value={v.id} disabled={busy}>
+                  {v.registration_number}
+                  {busy ? ` · ${reason ?? "Busy"}` : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div>
@@ -234,14 +273,19 @@ export function TripConvoy({ tripId }: { tripId: string }) {
             id="tv-driver"
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             value={draft.driver_id}
-            onChange={(e) => setDraft((d) => ({ ...d, driver_id: e.target.value }))}
+            onChange={(e) => pickDriver(e.target.value)}
           >
             <option value="">—</option>
-            {drivers.map((v: any) => (
-              <option key={v.id} value={v.id}>
-                {v.full_name}
-              </option>
-            ))}
+            {drivers.map((v: any) => {
+              const busy = availability.busyDriverIds.has(String(v.id));
+              const reason = availability.busyReasonByDriverId.get(String(v.id));
+              return (
+                <option key={v.id} value={v.id} disabled={busy}>
+                  {v.full_name}
+                  {busy ? ` · ${reason ?? "Busy"}` : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div>
@@ -255,11 +299,16 @@ export function TripConvoy({ tripId }: { tripId: string }) {
             onChange={(e) => setDraft((d) => ({ ...d, trailer_id: e.target.value }))}
           >
             <option value="">—</option>
-            {trailers.map((v: any) => (
-              <option key={v.id} value={v.id}>
-                {v.registration_number}
-              </option>
-            ))}
+            {trailers.map((v: any) => {
+              const busy = availability.busyTrailerIds.has(String(v.id));
+              const reason = availability.busyReasonByVehicleId.get(String(v.id));
+              return (
+                <option key={v.id} value={v.id} disabled={busy}>
+                  {v.registration_number}
+                  {busy ? ` · ${reason ?? "Busy"}` : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div>
