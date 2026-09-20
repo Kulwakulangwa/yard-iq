@@ -88,7 +88,6 @@ function VehicleProfile() {
             String(t.vehicle_id) !== vehicleId && convoyTripIds.has(String(t.id)),
         }));
 
-      // Coupled trailer (if any)
       const coupledTrailer = vehicle?.coupled_to_id
         ? vehicles.find((x: any) => String(x.id) === String(vehicle.coupled_to_id)) ?? null
         : null;
@@ -142,10 +141,13 @@ function VehicleProfile() {
   const fuelTabCount = data.fuelAllocations.length + data.fuelExpenses.length;
 
   function openNewMaintenance() {
-    maintenanceEditor.openNew({
-      vehicle_id: vehicleId,
-      maintenance_date: new Date().toISOString().slice(0, 10),
-    });
+    maintenanceEditor.openNew(
+      {
+        vehicle_id: vehicleId,
+        maintenance_date: new Date().toISOString().slice(0, 10),
+      },
+      ["vehicle_id"], // locked — opened from this vehicle's page
+    );
   }
 
   return (
