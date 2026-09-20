@@ -74,7 +74,6 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Row>({});
   const [editingId, setEditingId] = useState<string | null>(null);
-  // Field keys whose "Show all" toggle is on (unlocks unrelated options)
   const [showAllFields, setShowAllFields] = useState<Set<string>>(new Set());
 
   const needsAvailability =
@@ -142,7 +141,6 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     return refs[table]?.find((o) => o.id === String(id))?.label ?? "—";
   };
 
-  /** Reasons a busy option is blocked (hard block, never overridable). */
   function busyReason(f: Field, optionId: string): string | null {
     if (!needsAvailability) return null;
     if (f.refTable === "drivers") {
@@ -165,10 +163,6 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     return null;
   }
 
-  /**
-   * Compute which options are unrelated to the current pivot for a given field.
-   * Returns null when the rule doesn't apply (no rule, no pivot, no data).
-   */
   function unrelatedSet(f: Field): Set<string> | null {
     if (!f.refRule) return null;
     const pivotValue = draft[f.refRule.by];
@@ -181,7 +175,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   }
 
   function setField(f: Field, value: unknown) {
-    // Pre-compute autoFill candidates outside setDraft (cleaner, no stale closures).
+    // Pre-compute autoFill candidates outside setDraft.
     const autoFill: Record<string, unknown> = {};
     for (const other of config.fields) {
       if (!other.refRule || other.refRule.by !== f.key) continue;
@@ -201,14 +195,28 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     setDraft((d) => {
       const next: Row = { ...d, [f.key]: value };
 
-      // Apply refRule autoFill — only when the target is currently empty
+      // ─── Validate dependent fields when a pivot changes ───
+      for (const other of config.fields) {
+        if (!other.refRule || other.refRule.by !== f.key) continue;
+        const current = next[other.key];
+        if (!current || current === "") continue;
+        const map = relatedIndex[other.refRule.resolve];
+        const newSet = value ? map?.get(String(value)) : undefined;
+        // Only clear when the pivot has a valid set and the current value
+        // isn't in it. If pivot was cleared, leave the dependent alone.
+        if (newSet && newSet.size > 0 && !newSet.has(String(current))) {
+          next[other.key] = "";
+        }
+      }
+
+      // ─── autoFill only when the target is still empty ───
       for (const [k, v] of Object.entries(autoFill)) {
         const current = next[k];
         const isEmpty = current === undefined || current === null || current === "";
         if (isEmpty || v === "") next[k] = v;
       }
 
-      // Trip-specific cascades (driver → truck → coupled trailer)
+      // ─── Trip-specific cascades ───
       if (config.table === "trips") {
         if (f.key === "driver_id" && typeof value === "string") {
           const assignedTruck = availability.truckByDriver.get(value);
@@ -259,13 +267,11 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
             const wide = f.type === "textarea";
             const showAll = showAllFields.has(f.key);
 
-            // Base options (before rule)
             const baseOptions = (refs[f.refTable as RefTable] ?? []).filter((o) => {
               if (!f.refFilter) return true;
               return o[f.refFilter.key] === f.refFilter.value;
             });
 
-            // refRule context
             const relevantSet = unrelatedSet(f);
             const irrelevantCount = relevantSet
               ? baseOptions.filter((o) => !relevantSet.has(o.id)).length
@@ -315,14 +321,24 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                         const isSelected = String(value ?? "") === o.id;
                         const busy = busyReason(f, o.id);
                         const unrelated = relevantSet ? !relevantSet.has(o.id) : false;
-                        const disabled =
-                          (!isSelected && Boolean(busy)) ||
-                          (!isSelected && unrelated && !showAll);
-                        const hint = busy
-                          ? ` · ${busy}`
-                          : unrelated && !showAll
+
+                        // If a refRule applies, `unrelated` is the primary filter
+                        // and busy fade does not disable options (a related option
+                        // is supposed to be busy — it's on the trip you're citing).
+                        const disabled = isSelected
+                          ? false
+                          : relevantSet
+                            ? unrelated && !showAll
+                            : Boolean(busy);
+
+                        const hint = relevantSet
+                          ? unrelated && !showAll
                             ? " · unrelated"
+                            : ""
+                          : busy
+                            ? ` · ${busy}`
                             : "";
+
                         return (
                           <option key={o.id} value={o.id} disabled={disabled}>
                             {o.label}
