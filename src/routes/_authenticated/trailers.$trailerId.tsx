@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Link2, Plus } from "lucide-react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
@@ -68,7 +68,6 @@ function TrailerProfile() {
         vehicles.map((v: any) => [String(v.id), String(v.registration_number ?? "")]),
       );
 
-      // Every trip_vehicles row where this trailer was coupled to a truck
       const couples = tripVehicles
         .filter((tv: any) => String(tv.trailer_id) === trailerId)
         .map((tv: any) => ({
@@ -91,8 +90,14 @@ function TrailerProfile() {
           revenue: Number(finByTrip.get(t.id)?.total_contract_tzs ?? 0),
         }));
 
+      // Current coupled truck (from vehicles.coupled_to_id)
+      const coupledTruck = trailer?.coupled_to_id
+        ? vehicles.find((x: any) => String(x.id) === String(trailer.coupled_to_id)) ?? null
+        : null;
+
       return {
         trailer,
+        coupledTruck,
         trips: ownTrips,
         couples,
         maintenance: maintenance.filter((m: any) => String(m.vehicle_id) === trailerId),
@@ -152,16 +157,31 @@ function TrailerProfile() {
           </Button>
         }
       />
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <StatusBadge value={v.status} />
-        {lastCouple ? (
+        {data.coupledTruck ? (
+          <span className="inline-flex items-center gap-1.5 text-sm">
+            <Link2 className="size-4 text-primary" />
+            <span className="text-muted-foreground">Coupled to truck</span>
+            <Link
+              to="/vehicles/$vehicleId"
+              params={{ vehicleId: String(data.coupledTruck.id) }}
+              className="font-medium text-primary hover:underline"
+            >
+              {data.coupledTruck.registration_number}
+            </Link>
+          </span>
+        ) : lastCouple ? (
           <span className="text-sm text-muted-foreground">
-            Last coupled to <strong className="text-foreground">{lastCouple.vehicleReg}</strong>
-            {" on "}
+            Free · last coupled to <strong className="text-foreground">{lastCouple.vehicleReg}</strong> on{" "}
             <strong className="text-foreground">{lastCouple.tripNumber}</strong>
           </span>
         ) : (
-          <span className="text-sm text-muted-foreground">Never coupled to a truck</span>
+          <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Link2 className="size-4" />
+            Never coupled to a truck
+          </span>
         )}
       </div>
 
@@ -203,7 +223,6 @@ function TrailerProfile() {
           </TabsList>
         </div>
 
-        {/* DETAILS */}
         <TabsContent value="details" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -232,6 +251,22 @@ function TrailerProfile() {
                   </dd>
                 </div>
               ))}
+              <div className="min-w-0 border-b p-4 sm:border-r">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Coupled truck</dt>
+                <dd className="mt-1 text-sm font-medium">
+                  {data.coupledTruck ? (
+                    <Link
+                      to="/vehicles/$vehicleId"
+                      params={{ vehicleId: String(data.coupledTruck.id) }}
+                      className="text-primary hover:underline"
+                    >
+                      {data.coupledTruck.registration_number}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground">Not coupled</span>
+                  )}
+                </dd>
+              </div>
               {v.notes ? (
                 <div className="min-w-0 border-b p-4 sm:col-span-2 xl:col-span-3">
                   <dt className="text-xs uppercase tracking-wide text-muted-foreground">Notes</dt>
@@ -242,7 +277,6 @@ function TrailerProfile() {
           </Card>
         </TabsContent>
 
-        {/* COUPLING HISTORY */}
         <TabsContent value="coupling" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -294,7 +328,6 @@ function TrailerProfile() {
           </Card>
         </TabsContent>
 
-        {/* TRIPS */}
         <TabsContent value="trips" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -342,7 +375,6 @@ function TrailerProfile() {
           </Card>
         </TabsContent>
 
-        {/* MAINTENANCE */}
         <TabsContent value="maintenance" className="mt-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
@@ -441,7 +473,6 @@ function TrailerProfile() {
           ) : null}
         </TabsContent>
 
-        {/* INSPECTIONS */}
         <TabsContent value="inspections" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -487,7 +518,6 @@ function TrailerProfile() {
           </Card>
         </TabsContent>
 
-        {/* TIRES */}
         <TabsContent value="tires" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
