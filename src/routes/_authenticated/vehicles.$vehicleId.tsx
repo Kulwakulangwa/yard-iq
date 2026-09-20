@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Link2, Plus } from "lucide-react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
@@ -69,8 +69,6 @@ function VehicleProfile() {
       const techName = new Map(technicians.map((t: any) => [String(t.id), t.full_name]));
       const tripNum = new Map(trips.map((t: any) => [String(t.id), t.trip_number]));
 
-      // Trips where this vehicle is EITHER the trip's main vehicle
-      // OR a truck on a convoy leg (trip_vehicles).
       const convoyTripIds = new Set(
         tripVehicles
           .filter((tv: any) => String(tv.vehicle_id) === vehicleId)
@@ -90,8 +88,14 @@ function VehicleProfile() {
             String(t.vehicle_id) !== vehicleId && convoyTripIds.has(String(t.id)),
         }));
 
+      // Coupled trailer (if any)
+      const coupledTrailer = vehicle?.coupled_to_id
+        ? vehicles.find((x: any) => String(x.id) === String(vehicle.coupled_to_id)) ?? null
+        : null;
+
       return {
         vehicle,
+        coupledTrailer,
         trips: ownTrips,
         maintenance: maintenance.filter((m: any) => String(m.vehicle_id) === vehicleId),
         workOrders: workOrders.filter((w: any) => String(w.vehicle_id) === vehicleId),
@@ -162,8 +166,27 @@ function VehicleProfile() {
           </Button>
         }
       />
-      <div className="mb-4">
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <StatusBadge value={v.status} />
+        {data.coupledTrailer ? (
+          <span className="inline-flex items-center gap-1.5 text-sm">
+            <Link2 className="size-4 text-primary" />
+            <span className="text-muted-foreground">Coupled to trailer</span>
+            <Link
+              to="/trailers/$trailerId"
+              params={{ trailerId: String(data.coupledTrailer.id) }}
+              className="font-medium text-primary hover:underline"
+            >
+              {data.coupledTrailer.registration_number}
+            </Link>
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Link2 className="size-4" />
+            No trailer coupled
+          </span>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -200,7 +223,6 @@ function VehicleProfile() {
           </TabsList>
         </div>
 
-        {/* DETAILS */}
         <TabsContent value="details" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -234,6 +256,20 @@ function VehicleProfile() {
                   </dd>
                 </div>
               ))}
+              {data.coupledTrailer ? (
+                <div className="min-w-0 border-b p-4 sm:border-r">
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Coupled trailer</dt>
+                  <dd className="mt-1 text-sm font-medium">
+                    <Link
+                      to="/trailers/$trailerId"
+                      params={{ trailerId: String(data.coupledTrailer.id) }}
+                      className="text-primary hover:underline"
+                    >
+                      {data.coupledTrailer.registration_number}
+                    </Link>
+                  </dd>
+                </div>
+              ) : null}
               {v.notes ? (
                 <div className="min-w-0 border-b p-4 sm:col-span-2 xl:col-span-3">
                   <dt className="text-xs uppercase tracking-wide text-muted-foreground">Notes</dt>
@@ -244,7 +280,6 @@ function VehicleProfile() {
           </Card>
         </TabsContent>
 
-        {/* TRIPS */}
         <TabsContent value="trips" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -305,7 +340,6 @@ function VehicleProfile() {
           </Card>
         </TabsContent>
 
-        {/* MAINTENANCE */}
         <TabsContent value="maintenance" className="mt-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
@@ -404,7 +438,6 @@ function VehicleProfile() {
           ) : null}
         </TabsContent>
 
-        {/* FUEL */}
         <TabsContent value="fuel" className="mt-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Stat label="Total litres" value={fuelLitres.toLocaleString()} sub="Allocated + expenses" tone="amber" />
@@ -510,7 +543,6 @@ function VehicleProfile() {
           </Card>
         </TabsContent>
 
-        {/* INSPECTIONS */}
         <TabsContent value="inspections" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -558,7 +590,6 @@ function VehicleProfile() {
           </Card>
         </TabsContent>
 
-        {/* TIRES */}
         <TabsContent value="tires" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
