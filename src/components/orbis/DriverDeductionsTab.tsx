@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Check, Plus, ShieldOff, Wallet } from "lucide-react";
+import { AlertCircle, Check, Info, Plus, ShieldOff, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { db } from "@/lib/db";
@@ -50,9 +50,16 @@ const CATEGORY_LABELS: Record<string, string> = {
 export function DriverDeductionsTab({
   driverId,
   advances,
+  currentTripId,
+  currentTripNumber,
+  currentVehicleId,
 }: {
   driverId: string;
   advances: number;
+  /** The driver's currently active trip, if any. Used to auto-lock the form. */
+  currentTripId?: string | null;
+  currentTripNumber?: string | null;
+  currentVehicleId?: string | null;
 }) {
   const qc = useQueryClient();
   const session = useSession() as { user?: unknown; isAdmin?: boolean; roles?: string[] };
@@ -105,16 +112,28 @@ export function DriverDeductionsTab({
   const waivedTotal = waived.reduce((s, d) => s + Number(d.amount_tzs ?? 0), 0);
 
   function openNewDeduction() {
-    editor.openNew(
-      {
-        driver_id: driverId,
-        deduction_date: new Date().toISOString().slice(0, 10),
-        category: "Other",
-        status: "Pending",
-      },
-      ["driver_id"], // locked — opened from this driver's page
-    );
+    const prefill: Record<string, unknown> = {
+      driver_id: driverId,
+      deduction_date: new Date().toISOString().slice(0, 10),
+      category: "Other",
+      status: "Pending",
+    };
+    const locks: string[] = ["driver_id"];
+
+    // Auto-fill and lock trip + truck to the driver's active trip
+    if (currentTripId) {
+      prefill.trip_id = currentTripId;
+      locks.push("trip_id");
+    }
+    if (currentVehicleId) {
+      prefill.vehicle_id = currentVehicleId;
+      locks.push("vehicle_id");
+    }
+
+    editor.openNew(prefill, locks);
   }
+
+  const hasActiveTrip = Boolean(currentTripId && currentVehicleId);
 
   return (
     <div className="space-y-4">
@@ -138,6 +157,16 @@ export function DriverDeductionsTab({
           tone="green"
         />
       </div>
+
+      {hasActiveTrip ? (
+        <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <Info className="mt-0.5 size-4 shrink-0 text-primary" />
+          <span>
+            Currently on <strong>{currentTripNumber}</strong>. New deductions will be locked to that trip
+            and its truck.
+          </span>
+        </div>
+      ) : null}
 
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
