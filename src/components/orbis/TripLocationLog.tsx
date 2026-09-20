@@ -120,6 +120,7 @@ export function TripLocationLog({ tripId }: { tripId: string }) {
     onSuccess: () => {
       resetDraft();
       qc.invalidateQueries({ queryKey: ["trip-locations", tripId] });
+      qc.invalidateQueries({ queryKey: ["trip-summary", tripId] });
       qc.invalidateQueries({ queryKey: ["convoy-legs"] });
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["office-dashboard"] });
