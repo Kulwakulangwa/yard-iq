@@ -88,7 +88,6 @@ function RankingCard({
   policeCases: any[];
   overdueDeductions: any[];
 }) {
-  // Same formula as the SQL function driver_rank_score()
   const incidentPenalty = incidents.reduce((s: number, i: any) => {
     const sev = String(i.severity ?? "");
     const p = sev === "Critical" ? 25 : sev === "High" ? 15 : sev === "Medium" ? 8 : sev === "Low" ? 3 : 5;
@@ -99,7 +98,6 @@ function RankingCard({
   const totalPenalty = incidentPenalty + casePenalty + overduePenalty;
   const score = Math.max(0, Math.min(100, 100 - totalPenalty));
   const tier = scoreTier(score);
-
   const stars = "★".repeat(tier.stars) + "☆".repeat(5 - tier.stars);
 
   return (
@@ -219,7 +217,6 @@ function DriverProfile() {
         ? reg.get(String(driver.assigned_trailer_id)) ?? null
         : null;
 
-      // Ranking inputs (12-month window matches the SQL function)
       const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
       const rankIncidents = incidents.filter((i: any) => {
         if (String(i.driver_id) !== driverId) return false;
@@ -292,11 +289,14 @@ function DriverProfile() {
     (licenceDays !== null && licenceDays < 90) || (passportDays !== null && passportDays < 90);
 
   function openRecordPayment() {
-    paymentEditor.openNew({
-      driver_id: driverId,
-      payment_date: new Date().toISOString().slice(0, 10),
-      payment_type: "Salary",
-    });
+    paymentEditor.openNew(
+      {
+        driver_id: driverId,
+        payment_date: new Date().toISOString().slice(0, 10),
+        payment_type: "Salary",
+      },
+      ["driver_id"], // locked — opened from this driver's page
+    );
   }
 
   return (
@@ -391,7 +391,6 @@ function DriverProfile() {
           </TabsList>
         </div>
 
-        {/* DETAILS */}
         <TabsContent value="details" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -444,7 +443,6 @@ function DriverProfile() {
           </Card>
         </TabsContent>
 
-        {/* TRIPS */}
         <TabsContent value="trips" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
@@ -509,7 +507,6 @@ function DriverProfile() {
           </Card>
         </TabsContent>
 
-        {/* PAYMENTS */}
         <TabsContent value="payments" className="mt-4">
           <Card className="overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
@@ -561,12 +558,10 @@ function DriverProfile() {
           </Card>
         </TabsContent>
 
-        {/* DEDUCTIONS */}
         <TabsContent value="deductions" className="mt-4">
           <DriverDeductionsTab driverId={driverId} advances={totalAdvances} />
         </TabsContent>
 
-        {/* DOCUMENTS */}
         <TabsContent value="documents" className="mt-4">
           <Card className="overflow-hidden">
             <div className="border-b px-4 py-3">
