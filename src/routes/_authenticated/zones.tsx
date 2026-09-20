@@ -21,7 +21,12 @@ export const Route = createFileRoute("/_authenticated/zones")({
 
 const db = supabase as never as { from: (t: string) => any };
 
-const IN_YARD_STATUSES = ["In Yard", "Loading", "On Hold", "In Maintenance"];
+// Anything except "On Trip" is physically in the yard.
+const YARD_STATUSES = ["Available", "In Yard", "Loading", "In Maintenance", "On Hold"];
+
+function isInYard(v: any) {
+  return YARD_STATUSES.includes(String(v.status));
+}
 
 function Zones() {
   const qc = useQueryClient();
@@ -108,8 +113,10 @@ function Zones() {
   });
 
   const zones = data?.zones ?? [];
-  const vehicles = data?.vehicles ?? [];
-  const byId = new Map(vehicles.map((v) => [String(v.id), v]));
+  const allVehicles = data?.vehicles ?? [];
+  // Only vehicles physically in the yard appear on the board.
+  const vehicles = allVehicles.filter(isInYard);
+  const byId = new Map(allVehicles.map((v) => [String(v.id), v]));
   const partnerLabel = (v: any) => {
     if (!v?.coupled_to_id) return null;
     return byId.get(String(v.coupled_to_id))?.registration_number ?? null;
@@ -118,14 +125,13 @@ function Zones() {
   const moving = movingId ? byId.get(movingId) ?? null : null;
   const coupling = couplingId ? byId.get(couplingId) ?? null : null;
 
+  // Free trailers = trailers in yard, uncoupled, eligible to be paired.
   const freeTrailers = vehicles.filter(
-    (v) => v.is_trailer && !v.coupled_to_id && v.status !== "On Trip",
+    (v) => v.is_trailer && !v.coupled_to_id,
   );
 
-  // Vehicles physically in the yard but without a zone assigned
-  const unassigned = vehicles.filter(
-    (v) => !v.yard_zone && IN_YARD_STATUSES.includes(String(v.status)),
-  );
+  // Yard vehicles with no zone assigned
+  const unassigned = vehicles.filter((v) => !v.yard_zone);
 
   function renderVehicleBlock(v: any) {
     const partner = partnerLabel(v);
@@ -191,8 +197,7 @@ function Zones() {
       {zones.length === 0 ? (
         <Card className="p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            No zones configured yet. Run the seed SQL to create the seven default zones
-            (Main Gate, Parking, Loading Bay, Unloading Bay, Workshop, Tire Store, Exit Gate).
+            No zones configured yet. Run the seed SQL to create the seven default zones.
           </p>
         </Card>
       ) : (
@@ -237,7 +242,6 @@ function Zones() {
             );
           })}
 
-          {/* Unassigned — vehicles physically in yard but no zone set */}
           {unassigned.length > 0 ? (
             <Card className="border-warning/40 bg-warning/5 p-4">
               <div className="mb-2 flex items-center justify-between">
@@ -260,7 +264,7 @@ function Zones() {
         ) : (
           <ul className="divide-y text-sm">
             {(data?.moves ?? []).map((m) => {
-              const v = vehicles.find((x) => x.id === m.vehicle_id);
+              const v = allVehicles.find((x) => x.id === m.vehicle_id);
               return (
                 <li key={m.id} className="flex flex-wrap items-center gap-2 py-2">
                   <span className="font-medium">{v?.registration_number ?? "—"}</span>
@@ -345,11 +349,11 @@ function Zones() {
               </select>
               {freeTrailers.length === 0 ? (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  No free trailers available. Uncouple one first.
+                  No free trailers available in the yard. Uncouple one first.
                 </p>
               ) : (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Only trailers not already coupled and not on trip are shown.
+                  Only trailers currently in the yard and uncoupled are shown.
                 </p>
               )}
             </div>
