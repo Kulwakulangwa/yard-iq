@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { StatusBadge } from "@/components/orbis/StatusBadge";
+import { PairingOverview } from "@/components/orbis/PairingOverview";
 
 export const Route = createFileRoute("/_authenticated/zones")({
   head: () => ({ meta: [{ title: "Yard Zones — Orbis Logistics" }] }),
@@ -21,7 +22,6 @@ export const Route = createFileRoute("/_authenticated/zones")({
 
 const db = supabase as never as { from: (t: string) => any };
 
-// Anything except "On Trip" is physically in the yard.
 const YARD_STATUSES = ["Available", "In Yard", "Loading", "In Maintenance", "On Hold"];
 
 function isInYard(v: any) {
@@ -114,7 +114,6 @@ function Zones() {
 
   const zones = data?.zones ?? [];
   const allVehicles = data?.vehicles ?? [];
-  // Only vehicles physically in the yard appear on the board.
   const vehicles = allVehicles.filter(isInYard);
   const byId = new Map(allVehicles.map((v) => [String(v.id), v]));
   const partnerLabel = (v: any) => {
@@ -125,12 +124,7 @@ function Zones() {
   const moving = movingId ? byId.get(movingId) ?? null : null;
   const coupling = couplingId ? byId.get(couplingId) ?? null : null;
 
-  // Free trailers = trailers in yard, uncoupled, eligible to be paired.
-  const freeTrailers = vehicles.filter(
-    (v) => v.is_trailer && !v.coupled_to_id,
-  );
-
-  // Yard vehicles with no zone assigned
+  const freeTrailers = vehicles.filter((v) => v.is_trailer && !v.coupled_to_id);
   const unassigned = vehicles.filter((v) => !v.yard_zone);
 
   function renderVehicleBlock(v: any) {
@@ -193,6 +187,10 @@ function Zones() {
   return (
     <>
       <PageHeader title="Yard Zones" subtitle="Live board of where every vehicle is standing" />
+
+      <div className="mb-5">
+        <PairingOverview vehicles={allVehicles} />
+      </div>
 
       {zones.length === 0 ? (
         <Card className="p-6 text-center">
