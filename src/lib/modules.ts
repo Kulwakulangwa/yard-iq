@@ -15,7 +15,6 @@ export type Field = {
   options?: string[];
   refTable?: RefTable;
   readOnly?: boolean;
-  /** Optional filter applied to ref dropdown options. */
   refFilter?: { key: string; value: unknown };
 };
 
@@ -28,7 +27,9 @@ export type RefTable =
   | "tires"
   | "work_orders"
   | "technicians"
-  | "contracts";
+  | "contracts"
+  | "fuel_allocations"
+  | "incidents";
 
 export type ModuleConfig = {
   table: string;
@@ -53,6 +54,8 @@ export const REF_LABEL: Record<RefTable, string> = {
   work_orders: "work_order_number",
   technicians: "full_name",
   contracts: "route",
+  fuel_allocations: "reference",
+  incidents: "incident_number",
 };
 
 export const modules = {
@@ -486,6 +489,28 @@ export const modules = {
       { key: "period_label", label: "Period (e.g. Sep 2026)" },
       { key: "reference_trip", label: "Trip", type: "ref", refTable: "trips" },
       { key: "notes", type: "textarea" },
+    ],
+  },
+  driver_deductions: {
+    table: "driver_deductions",
+    title: "Driver Deductions",
+    subtitle: "Money owed by drivers for fuel, tires, damage and other costs",
+    columns: ["deduction_date", "driver_id", "category", "amount_tzs", "status"],
+    statusKey: "status",
+    searchKeys: ["reason", "category"],
+    fields: [
+      { key: "driver_id", label: "Driver", type: "ref", refTable: "drivers" },
+      { key: "deduction_date", type: "date" },
+      { key: "category", type: "select", options: ["Fuel", "Tire", "Damage", "Cash Advance", "Other"] },
+      { key: "amount_tzs", label: "Amount (TZS)", type: "number" },
+      { key: "reason", type: "textarea" },
+      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
+      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles" },
+      { key: "tire_id", label: "Tire", type: "ref", refTable: "tires" },
+      { key: "fuel_allocation_id", label: "Fuel allocation", type: "ref", refTable: "fuel_allocations" },
+      { key: "incident_id", label: "Incident", type: "ref", refTable: "incidents" },
+      { key: "status", type: "select", options: ["Pending", "Approved", "Settled", "Waived"] },
+      { key: "settled_notes", type: "textarea" },
     ],
   },
   operational_expenses: {
