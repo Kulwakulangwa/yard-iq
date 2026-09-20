@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
  * Called whenever a trip's status changes from the office side
  * (trips list "Move to X" menu, trip edit dialog save).
  *
- * Coupled trailers follow their truck automatically — see syncTrucksForTrip.
+ * Coupled trailers follow their truck automatically.
+ * Drivers follow too, unless they're Suspended or Off Duty.
  */
 const TRIP_TO_VEHICLE: Record<
   string,
@@ -25,18 +26,21 @@ const TRIP_TO_VEHICLE: Record<
   Cancelled: { vehicleStatus: "Available", clearYardZone: false },
 };
 
+/** Which trip statuses put drivers in the "On Trip" state. */
+const ACTIVE_TRIP_STATUSES = ["Dispatched", "In Transit", "At Border"];
+
 /**
  * Push a trip's status down to every truck assigned to that trip,
- * plus each truck's coupled trailer (they travel together).
+ * each truck's coupled trailer, and every driver on the trip.
  */
 export async function syncTrucksForTrip(tripId: string, tripStatus: string) {
   const rule = TRIP_TO_VEHICLE[tripStatus];
   if (!rule) return;
 
-  // 1. Trucks on this trip
+  // 1. Trucks on this trip (with their drivers too)
   const { data: legs, error: legsErr } = await db
     .from("trip_vehicles")
-    .select("vehicle_id")
+    .select("vehicle_id, driver_id")
     .eq("trip_id", tripId);
   if (legsErr) throw legsErr;
 
@@ -44,26 +48,55 @@ export async function syncTrucksForTrip(tripId: string, tripStatus: string) {
     .map((l) => l.vehicle_id)
     .filter((v): v is string => Boolean(v));
 
-  if (truckIds.length === 0) return;
-
-  // 2. Coupled trailers of those trucks
-  const { data: trucks, error: trucksErr } = await db
-    .from("vehicles")
-    .select("id, coupled_to_id")
-    .in("id", truckIds);
-  if (trucksErr) throw trucksErr;
-
-  const trailerIds = ((trucks ?? []) as { coupled_to_id: string | null }[])
-    .map((t) => t.coupled_to_id)
+  const convoyDriverIds = ((legs ?? []) as { driver_id: string | null }[])
+    .map((l) => l.driver_id)
     .filter((v): v is string => Boolean(v));
 
-  // 3. Update trucks + their coupled trailers in one statement
-  const allIds = [...truckIds, ...trailerIds];
-  const patch: Record<string, unknown> = { status: rule.vehicleStatus };
-  if (rule.clearYardZone) patch["yard_zone"] = null;
+  // 2. Trip's own main driver
+  const { data: trip, error: tripErr } = await db
+    .from("trips")
+    .select("driver_id")
+    .eq("id", tripId)
+    .maybeSingle();
+  if (tripErr) throw tripErr;
 
-  const { error } = await db.from("vehicles").update(patch).in("id", allIds);
-  if (error) throw error;
+  const mainDriverId = (trip as { driver_id: string | null } | null)?.driver_id ?? null;
+
+  // 3. Coupled trailers of the trucks
+  let trailerIds: string[] = [];
+  if (truckIds.length > 0) {
+    const { data: trucks, error: trucksErr } = await db
+      .from("vehicles")
+      .select("id, coupled_to_id")
+      .in("id", truckIds);
+    if (trucksErr) throw trucksErr;
+    trailerIds = ((trucks ?? []) as { coupled_to_id: string | null }[])
+      .map((t) => t.coupled_to_id)
+      .filter((v): v is string => Boolean(v));
+  }
+
+  // 4. Update vehicles (trucks + coupled trailers)
+  const allVehicleIds = [...truckIds, ...trailerIds];
+  if (allVehicleIds.length > 0) {
+    const vehiclePatch: Record<string, unknown> = { status: rule.vehicleStatus };
+    if (rule.clearYardZone) vehiclePatch["yard_zone"] = null;
+    const { error } = await db.from("vehicles").update(vehiclePatch).in("id", allVehicleIds);
+    if (error) throw error;
+  }
+
+  // 5. Update drivers — but only if they're not manually flagged
+  const allDriverIds = [...new Set([mainDriverId, ...convoyDriverIds].filter((v): v is string => Boolean(v)))];
+  if (allDriverIds.length > 0) {
+    const targetDriverStatus = ACTIVE_TRIP_STATUSES.includes(tripStatus) ? "On Trip" : "Available";
+    // Only flip drivers who are currently Available or On Trip —
+    // never overwrite a manual Suspended / Off Duty.
+    const { error } = await db
+      .from("drivers")
+      .update({ status: targetDriverStatus })
+      .in("id", allDriverIds)
+      .in("status", ["Available", "On Trip"]);
+    if (error) throw error;
+  }
 }
 
 /** Release a single truck back to Available when it is removed from a trip. */
