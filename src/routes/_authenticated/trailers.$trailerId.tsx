@@ -90,7 +90,6 @@ function TrailerProfile() {
           revenue: Number(finByTrip.get(t.id)?.total_contract_tzs ?? 0),
         }));
 
-      // Current coupled truck (from vehicles.coupled_to_id)
       const coupledTruck = trailer?.coupled_to_id
         ? vehicles.find((x: any) => String(x.id) === String(trailer.coupled_to_id)) ?? null
         : null;
@@ -133,10 +132,13 @@ function TrailerProfile() {
   const lastCouple = data.couples[0];
 
   function openNewMaintenance() {
-    maintenanceEditor.openNew({
-      vehicle_id: trailerId,
-      maintenance_date: new Date().toISOString().slice(0, 10),
-    });
+    maintenanceEditor.openNew(
+      {
+        vehicle_id: trailerId,
+        maintenance_date: new Date().toISOString().slice(0, 10),
+      },
+      ["vehicle_id"], // locked — opened from this trailer's page
+    );
   }
 
   return (
