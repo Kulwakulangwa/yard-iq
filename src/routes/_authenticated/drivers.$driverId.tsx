@@ -37,6 +37,8 @@ export const Route = createFileRoute("/_authenticated/drivers/$driverId")({
   component: DriverProfile,
 });
 
+const ACTIVE_TRIP_STATUSES = ["Dispatched", "In Transit", "In Yard", "At Border"];
+
 function formatDate(value: unknown) {
   if (!value) return "—";
   const d = new Date(String(value));
@@ -197,11 +199,20 @@ function DriverProfile() {
           const convoyVehicles = convoyLegs
             .map((leg: any) => reg.get(String(leg.vehicle_id)) ?? "—")
             .filter((x: string) => x !== "—");
+          // Which vehicle is THIS driver actually on for this trip?
+          const driverVehicleId = isPrimary
+            ? t.vehicle_id
+              ? String(t.vehicle_id)
+              : null
+            : convoyLegs[0]?.vehicle_id
+              ? String(convoyLegs[0].vehicle_id)
+              : null;
           return {
             ...t,
             isPrimary,
             isConvoyOnly: !isPrimary && convoyLegs.length > 0,
             convoyVehicle: convoyVehicles.join(", "),
+            driverVehicleId,
             vehicle: reg.get(String(t.vehicle_id)) ?? "—",
             advance: isPrimary ? Number(finByTrip.get(String(t.id))?.advance_paid_tzs ?? 0) : 0,
           };
@@ -236,6 +247,11 @@ function DriverProfile() {
         return new Date(String(d.deduction_date)).getTime() < thirtyDaysAgo;
       });
 
+      // The driver's currently active trip (if any)
+      const activeTrip = ownTrips.find((t: any) =>
+        ACTIVE_TRIP_STATUSES.includes(String(t.status)),
+      ) ?? null;
+
       return {
         driver,
         trips: ownTrips,
@@ -246,6 +262,9 @@ function DriverProfile() {
         rankIncidents,
         rankCases,
         rankOverdue,
+        currentTripId: activeTrip?.id ? String(activeTrip.id) : null,
+        currentTripNumber: activeTrip?.trip_number ? String(activeTrip.trip_number) : null,
+        currentVehicleId: activeTrip?.driverVehicleId ?? null,
       };
     },
   });
@@ -289,14 +308,17 @@ function DriverProfile() {
     (licenceDays !== null && licenceDays < 90) || (passportDays !== null && passportDays < 90);
 
   function openRecordPayment() {
-    paymentEditor.openNew(
-      {
-        driver_id: driverId,
-        payment_date: new Date().toISOString().slice(0, 10),
-        payment_type: "Salary",
-      },
-      ["driver_id"], // locked — opened from this driver's page
-    );
+    const prefill: Record<string, unknown> = {
+      driver_id: driverId,
+      payment_date: new Date().toISOString().slice(0, 10),
+      payment_type: "Salary",
+    };
+    const locks: string[] = ["driver_id"];
+    if (data.currentTripId) {
+      prefill.reference_trip = data.currentTripId;
+      locks.push("reference_trip");
+    }
+    paymentEditor.openNew(prefill, locks);
   }
 
   return (
@@ -559,7 +581,13 @@ function DriverProfile() {
         </TabsContent>
 
         <TabsContent value="deductions" className="mt-4">
-          <DriverDeductionsTab driverId={driverId} advances={totalAdvances} />
+          <DriverDeductionsTab
+            driverId={driverId}
+            advances={totalAdvances}
+            currentTripId={data.currentTripId}
+            currentTripNumber={data.currentTripNumber}
+            currentVehicleId={data.currentVehicleId}
+          />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-4">
