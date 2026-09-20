@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { StatusBadge } from "@/components/orbis/StatusBadge";
 import { Stat } from "@/components/orbis/Stat";
+import { PairingOverview } from "@/components/orbis/PairingOverview";
 
 export const Route = createFileRoute("/_authenticated/yard")({
   head: () => ({ meta: [{ title: "Yard Dashboard — Orbis Logistics" }] }),
@@ -99,6 +100,10 @@ function YardDashboard() {
               value={inYard.filter((v) => v.status === "On Hold").length}
               tone="red"
             />
+          </div>
+
+          <div className="mt-5">
+            <PairingOverview vehicles={d?.vehicles ?? []} />
           </div>
 
           <Card className="mt-5 p-4">
