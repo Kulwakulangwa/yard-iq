@@ -105,12 +105,15 @@ export function DriverDeductionsTab({
   const waivedTotal = waived.reduce((s, d) => s + Number(d.amount_tzs ?? 0), 0);
 
   function openNewDeduction() {
-    editor.openNew({
-      driver_id: driverId,
-      deduction_date: new Date().toISOString().slice(0, 10),
-      category: "Other",
-      status: "Pending",
-    });
+    editor.openNew(
+      {
+        driver_id: driverId,
+        deduction_date: new Date().toISOString().slice(0, 10),
+        category: "Other",
+        status: "Pending",
+      },
+      ["driver_id"], // locked — opened from this driver's page
+    );
   }
 
   return (
