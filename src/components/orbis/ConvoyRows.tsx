@@ -31,6 +31,16 @@ export function ago(iso: string) {
   return `${Math.round(hours / 24)} d ago`;
 }
 
+function pickNewer(a: Row | undefined, b: Row | undefined): Row | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const ta = new Date(String(a["reported_at"] ?? "")).getTime();
+  const tb = new Date(String(b["reported_at"] ?? "")).getTime();
+  if (Number.isNaN(ta)) return b;
+  if (Number.isNaN(tb)) return a;
+  return ta >= tb ? a : b;
+}
+
 export function useConvoyLegs() {
   return useQuery({
     queryKey: ["convoy-legs"],
@@ -45,10 +55,9 @@ export function useConvoyLegs() {
       const vName = new Map(((vehicles ?? []) as Row[]).map((v) => [String(v["id"]), String(v["registration_number"] ?? "")]));
       const dName = new Map(((drivers ?? []) as Row[]).map((d) => [String(d["id"]), String(d["full_name"] ?? "")]));
 
-      // Latest location by leg id (explicit per-truck).
+      // Latest per-leg location
       const latestByLeg = new Map<string, Row>();
-      // Latest location by trip id, only when it is NOT tied to a leg
-      // (i.e. recorded with "Whole trip").
+      // Latest trip-wide (no leg) location
       const latestTripOnly = new Map<string, Row>();
       for (const loc of (locations ?? []) as Row[]) {
         const legId = loc["trip_vehicle_id"] ? String(loc["trip_vehicle_id"]) : "";
@@ -60,7 +69,6 @@ export function useConvoyLegs() {
         }
       }
 
-      // Group legs by trip so we know how many trucks each trip has.
       const legsByTrip = new Map<string, Row[]>();
       for (const leg of (legs ?? []) as Row[]) {
         const tripId = String(leg["trip_id"]);
@@ -69,15 +77,11 @@ export function useConvoyLegs() {
 
       const byTrip = new Map<string, ConvoyLeg[]>();
       for (const [tripId, tripLegs] of legsByTrip) {
-        const isSoloTrip = tripLegs.length === 1;
-        const tripFallback = latestTripOnly.get(tripId);
-
+        const tripWide = latestTripOnly.get(tripId);
         for (const leg of tripLegs) {
           const id = String(leg["id"]);
-          // Per-truck location wins. On a single-truck trip, fall back
-          // to a "Whole trip" entry. On a convoy, do NOT fall back —
-          // each truck shows its own, or nothing.
-          const loc = latestByLeg.get(id) ?? (isSoloTrip ? tripFallback : undefined) ?? {};
+          // Use whichever is more recent — per-truck or whole-trip
+          const loc = pickNewer(latestByLeg.get(id), tripWide) ?? {};
           const entry: ConvoyLeg = {
             id,
             tripId,
@@ -99,7 +103,6 @@ export function useConvoyLegs() {
   });
 }
 
-/** Compact — used on the trips list page. */
 export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: number }) {
   return (
     <>
@@ -141,7 +144,6 @@ export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: n
   );
 }
 
-/** Full vertical card-list of every truck on a trip. */
 export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
   if (legs.length === 0) {
     return (
