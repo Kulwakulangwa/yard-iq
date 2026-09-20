@@ -8,6 +8,18 @@ export type FieldType =
   | "ref"
   | "boolean";
 
+/** Names of the lookup maps exposed by useRelatedIndex(). */
+export type RefResolveKey =
+  | "tripsByCustomer"
+  | "tripsByVehicle"
+  | "tripsByDriver"
+  | "vehiclesByTrip"
+  | "trucksByTrip"
+  | "trailersByTrip"
+  | "driversByTrip"
+  | "loadsByTrip"
+  | "tiresByVehicle";
+
 export type Field = {
   key: string;
   label?: string;
@@ -15,7 +27,21 @@ export type Field = {
   options?: string[];
   refTable?: RefTable;
   readOnly?: boolean;
+  /** Hard filter on option properties — e.g. only is_trailer=false. */
   refFilter?: { key: string; value: unknown };
+  /**
+   * Contextual filter. When set, the field's options are restricted to
+   * whatever the pivot field (`by`) maps to via the lookup (`resolve`).
+   * Options outside that set render faded with a small hint.
+   * If the pivot is empty, no filtering happens.
+   */
+  refRule?: {
+    by: string;
+    resolve: RefResolveKey;
+    /** Auto-fill this field with the first match when the pivot changes,
+     *  but only if the field is currently empty. */
+    autoFill?: boolean;
+  };
 };
 
 export type RefTable =
@@ -198,8 +224,21 @@ export const modules = {
     fields: [
       { key: "reference", readOnly: true },
       { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
-      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles", refFilter: { key: "is_trailer", value: false } },
-      { key: "driver_id", label: "Driver", type: "ref", refTable: "drivers" },
+      {
+        key: "vehicle_id",
+        label: "Vehicle",
+        type: "ref",
+        refTable: "vehicles",
+        refFilter: { key: "is_trailer", value: false },
+        refRule: { by: "trip_id", resolve: "trucksByTrip", autoFill: true },
+      },
+      {
+        key: "driver_id",
+        label: "Driver",
+        type: "ref",
+        refTable: "drivers",
+        refRule: { by: "trip_id", resolve: "driversByTrip", autoFill: true },
+      },
       { key: "fuel_type", type: "select", options: ["Diesel", "Petrol"] },
       { key: "planned_litres", type: "number" },
       { key: "approved_litres", type: "number" },
@@ -284,8 +323,20 @@ export const modules = {
       { key: "currency" },
       { key: "supplier" },
       { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
-      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles" },
-      { key: "load_id", label: "Load", type: "ref", refTable: "loads" },
+      {
+        key: "vehicle_id",
+        label: "Vehicle",
+        type: "ref",
+        refTable: "vehicles",
+        refRule: { by: "trip_id", resolve: "vehiclesByTrip" },
+      },
+      {
+        key: "load_id",
+        label: "Load",
+        type: "ref",
+        refTable: "loads",
+        refRule: { by: "trip_id", resolve: "loadsByTrip" },
+      },
       { key: "work_order_id", label: "Work order", type: "ref", refTable: "work_orders" },
       { key: "receipt_url", label: "Receipt link" },
       { key: "status", type: "select", options: ["Draft", "Submitted", "Approved", "Paid", "Rejected"] },
@@ -410,11 +461,35 @@ export const modules = {
       { key: "severity", type: "select", options: ["Low", "Medium", "High", "Critical"] },
       { key: "occurred_at", type: "datetime" },
       { key: "location" },
-      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles" },
-      { key: "driver_id", label: "Driver", type: "ref", refTable: "drivers" },
+      {
+        key: "vehicle_id",
+        label: "Vehicle",
+        type: "ref",
+        refTable: "vehicles",
+        refRule: { by: "trip_id", resolve: "vehiclesByTrip" },
+      },
+      {
+        key: "driver_id",
+        label: "Driver",
+        type: "ref",
+        refTable: "drivers",
+        refRule: { by: "trip_id", resolve: "driversByTrip" },
+      },
       { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
-      { key: "load_id", label: "Load", type: "ref", refTable: "loads" },
-      { key: "tire_id", label: "Tire", type: "ref", refTable: "tires" },
+      {
+        key: "load_id",
+        label: "Load",
+        type: "ref",
+        refTable: "loads",
+        refRule: { by: "trip_id", resolve: "loadsByTrip" },
+      },
+      {
+        key: "tire_id",
+        label: "Tire",
+        type: "ref",
+        refTable: "tires",
+        refRule: { by: "vehicle_id", resolve: "tiresByVehicle" },
+      },
       { key: "description", type: "textarea" },
       { key: "people_involved", type: "textarea" },
       { key: "financial_impact", type: "number" },
@@ -487,7 +562,13 @@ export const modules = {
       { key: "amount_tzs", label: "Amount (TZS)", type: "number" },
       { key: "payment_date", type: "date" },
       { key: "period_label", label: "Period (e.g. Sep 2026)" },
-      { key: "reference_trip", label: "Trip", type: "ref", refTable: "trips" },
+      {
+        key: "reference_trip",
+        label: "Trip",
+        type: "ref",
+        refTable: "trips",
+        refRule: { by: "driver_id", resolve: "tripsByDriver" },
+      },
       { key: "notes", type: "textarea" },
     ],
   },
@@ -505,8 +586,20 @@ export const modules = {
       { key: "amount_tzs", label: "Amount (TZS)", type: "number" },
       { key: "reason", type: "textarea" },
       { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
-      { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles" },
-      { key: "tire_id", label: "Tire", type: "ref", refTable: "tires" },
+      {
+        key: "vehicle_id",
+        label: "Vehicle",
+        type: "ref",
+        refTable: "vehicles",
+        refRule: { by: "trip_id", resolve: "vehiclesByTrip" },
+      },
+      {
+        key: "tire_id",
+        label: "Tire",
+        type: "ref",
+        refTable: "tires",
+        refRule: { by: "vehicle_id", resolve: "tiresByVehicle" },
+      },
       { key: "fuel_allocation_id", label: "Fuel allocation", type: "ref", refTable: "fuel_allocations" },
       { key: "incident_id", label: "Incident", type: "ref", refTable: "incidents" },
       { key: "status", type: "select", options: ["Pending", "Approved", "Settled", "Waived"] },
