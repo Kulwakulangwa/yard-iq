@@ -25,6 +25,8 @@ export type RelatedIndex = {
   trailersByTrip: Map<string, Set<string>>;
   /** trip_id → set of driver_ids */
   driversByTrip: Map<string, Set<string>>;
+  /** vehicle_id → set of driver_ids that ever drove that vehicle on a trip */
+  driversByVehicle: Map<string, Set<string>>;
   /** trip_id → set of load_ids */
   loadsByTrip: Map<string, Set<string>>;
   /** vehicle_id → set of tire_ids currently installed */
@@ -40,6 +42,7 @@ const EMPTY_INDEX: RelatedIndex = {
   trucksByTrip: new Map(),
   trailersByTrip: new Map(),
   driversByTrip: new Map(),
+  driversByVehicle: new Map(),
   loadsByTrip: new Map(),
   tiresByVehicle: new Map(),
   isLoading: false,
@@ -85,6 +88,7 @@ export function useRelatedIndex(): RelatedIndex {
     const trucksByTrip = new Map<string, Set<string>>();
     const trailersByTrip = new Map<string, Set<string>>();
     const driversByTrip = new Map<string, Set<string>>();
+    const driversByVehicle = new Map<string, Set<string>>();
     const loadsByTrip = new Map<string, Set<string>>();
     const tiresByVehicle = new Map<string, Set<string>>();
 
@@ -104,6 +108,8 @@ export function useRelatedIndex(): RelatedIndex {
         push(vehiclesByTrip, tripId, v);
         if (trailerIdSet.has(v)) push(trailersByTrip, tripId, v);
         else push(trucksByTrip, tripId, v);
+        // Two-hop: vehicle → its driver on this trip
+        if (t.driver_id) push(driversByVehicle, v, String(t.driver_id));
       }
       if (t.driver_id) {
         const d = String(t.driver_id);
@@ -121,6 +127,7 @@ export function useRelatedIndex(): RelatedIndex {
         push(vehiclesByTrip, tripId, v);
         if (trailerIdSet.has(v)) push(trailersByTrip, tripId, v);
         else push(trucksByTrip, tripId, v);
+        if (tv.driver_id) push(driversByVehicle, v, String(tv.driver_id));
       }
       if (tv.trailer_id) {
         const v = String(tv.trailer_id);
@@ -153,6 +160,7 @@ export function useRelatedIndex(): RelatedIndex {
       trucksByTrip,
       trailersByTrip,
       driversByTrip,
+      driversByVehicle,
       loadsByTrip,
       tiresByVehicle,
       isLoading: false,
