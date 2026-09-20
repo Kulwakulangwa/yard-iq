@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MapPin, Pencil, Plus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, MapPin, Pencil, Plus } from "lucide-react";
 
 import { db } from "@/lib/db";
 import { modules, type ModuleConfig, type RefTable } from "@/lib/modules";
@@ -13,6 +13,7 @@ import { PageHeader } from "./AppShell";
 import { ConvoyLegList, useConvoyLegs } from "./ConvoyRows";
 import { ModuleStats } from "./ModuleStats";
 import { StatusBadge } from "./StatusBadge";
+import { SuggestedDeduction } from "./SuggestedDeduction";
 import { TripHeader } from "./TripHeader";
 import { TripSummaryCards } from "./TripSummaryCards";
 import { TripExpensesTable } from "./TripExpensesTable";
@@ -29,6 +30,22 @@ function useRecord(config: ModuleConfig, recordId: string) {
   });
 }
 
+/** Map an incident type to a deduction category. */
+function categoryFromIncidentType(t: unknown): string {
+  switch (String(t ?? "")) {
+    case "Missing Tire":
+      return "Tire";
+    case "Fuel Variance":
+      return "Fuel";
+    case "Damage":
+    case "Theft Suspected":
+    case "Accident":
+      return "Damage";
+    default:
+      return "Other";
+  }
+}
+
 function TripSummary({
   row,
   refs,
@@ -43,8 +60,6 @@ function TripSummary({
   const { data: convoy } = useConvoyLegs();
   const legs = convoy?.get(tripId) ?? [];
 
-  // Raw trip_vehicles rows — needed for contract/advance/fuel sums,
-  // since ConvoyLeg (above) doesn't carry those financial fields.
   const { data: trucks = [] } = useQuery({
     queryKey: ["trip-vehicles-financial", tripId],
     queryFn: async () => {
@@ -113,12 +128,7 @@ function TripSummary({
         }
       />
 
-      <TripSummaryCards
-        finance={finance}
-        expenses={data.expenses}
-        trucks={trucks}
-        fx={fx}
-      />
+      <TripSummaryCards finance={finance} expenses={data.expenses} trucks={trucks} fx={fx} />
 
       <section className="mt-6">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
@@ -189,6 +199,61 @@ function TripSummary({
   );
 }
 
+/**
+ * Compute the prefill + dedupe hint for the SuggestedDeduction button on
+ * non-trip modules. Returns null when the module/record doesn't support it.
+ */
+function deductionSuggestion(config: ModuleConfig, row: Row): {
+  prefill: Record<string, unknown>;
+  dedupe: { key: string; value: string };
+  label: string;
+} | null {
+  if (config.table === "incidents") {
+    const impact = Number(row["financial_impact"] ?? 0);
+    if (!impact || impact <= 0) return null;
+    const incidentNumber = String(row["incident_number"] ?? "");
+    const description = String(row["description"] ?? "");
+    const driverId = row["driver_id"];
+    if (!driverId) return null;
+    return {
+      prefill: {
+        driver_id: driverId,
+        category: categoryFromIncidentType(row["incident_type"]),
+        amount_tzs: impact,
+        reason:
+          [incidentNumber, description].filter(Boolean).join(" — ") ||
+          `Incident ${incidentNumber}`,
+        trip_id: row["trip_id"] ?? undefined,
+        vehicle_id: row["vehicle_id"] ?? undefined,
+        tire_id: row["tire_id"] ?? undefined,
+        incident_id: row["id"],
+        status: "Pending",
+      },
+      dedupe: { key: "incident_id", value: String(row["id"]) },
+      label: "Create deduction",
+    };
+  }
+
+  if (config.table === "tires") {
+    const status = String(row["status"] ?? "");
+    if (status !== "Missing" && status !== "Disputed") return null;
+    const serial = String(row["serial_number"] ?? "");
+    return {
+      prefill: {
+        category: "Tire",
+        reason: `${status} tire ${serial}`.trim(),
+        vehicle_id: row["vehicle_id"] ?? undefined,
+        tire_id: row["id"],
+        status: "Pending",
+      },
+      dedupe: { key: "tire_id", value: String(row["id"]) },
+      label: "Create tire deduction",
+    };
+  }
+
+  return null;
+}
+
 export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig; recordId: string; slug: string }) {
   const { data: row, isLoading, error } = useRecord(config, recordId);
   const { data: refs = {} } = useRefOptions(config.fields);
@@ -235,6 +300,9 @@ export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig
 
   const route =
     row["origin"] && row["destination"] ? `${row["origin"]} → ${row["destination"]}` : config.subtitle;
+
+  const suggestion = deductionSuggestion(config, row);
+
   return (
     <>
       {backLink}
@@ -242,11 +310,32 @@ export function RecordSummary({ config, recordId, slug }: { config: ModuleConfig
         title={String(row[titleKey] ?? config.title.replace(/s$/, ""))}
         subtitle={String(route)}
         actions={
-          <Button onClick={() => editor.openEdit(row)}>
-            <Pencil className="size-4" /> Edit record
-          </Button>
+          <>
+            {suggestion ? (
+              <SuggestedDeduction
+                prefill={suggestion.prefill}
+                dedupe={suggestion.dedupe}
+                label={suggestion.label}
+              />
+            ) : null}
+            <Button onClick={() => editor.openEdit(row)}>
+              <Pencil className="size-4" /> Edit record
+            </Button>
+          </>
         }
       />
+
+      {config.table === "incidents" && Number(row["financial_impact"] ?? 0) > 0 ? (
+        <div className="mb-3 flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-foreground" />
+          <span>
+            This incident has a financial impact of{" "}
+            <strong>{formatValue(row["financial_impact"])} TZS</strong>. Use{" "}
+            <strong>Create deduction</strong> above to charge it to the responsible driver.
+          </span>
+        </div>
+      ) : null}
+
       {editor.dialog}
       {config.statusKey ? (
         <div className="mb-4">
