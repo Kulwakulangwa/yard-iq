@@ -1,6 +1,15 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, MapPin, Phone, Printer, Truck, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Award,
+  MapPin,
+  Phone,
+  Printer,
+  Truck,
+  Wallet,
+} from "lucide-react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
@@ -61,20 +70,113 @@ function ExpiryBadge({ days }: { days: number | null }) {
   return <span className="text-xs text-muted-foreground">{days}d left</span>;
 }
 
+function scoreTier(score: number): { label: string; tone: string; stars: number } {
+  if (score >= 90) return { label: "Excellent", tone: "text-success", stars: 5 };
+  if (score >= 75) return { label: "Good", tone: "text-primary", stars: 4 };
+  if (score >= 60) return { label: "Fair", tone: "text-warning-foreground", stars: 3 };
+  if (score >= 40) return { label: "Needs attention", tone: "text-warning-foreground", stars: 2 };
+  if (score >= 20) return { label: "Poor", tone: "text-destructive", stars: 1 };
+  return { label: "Critical", tone: "text-destructive", stars: 0 };
+}
+
+function RankingCard({
+  incidents,
+  policeCases,
+  overdueDeductions,
+}: {
+  incidents: any[];
+  policeCases: any[];
+  overdueDeductions: any[];
+}) {
+  // Same formula as the SQL function driver_rank_score()
+  const incidentPenalty = incidents.reduce((s: number, i: any) => {
+    const sev = String(i.severity ?? "");
+    const p = sev === "Critical" ? 25 : sev === "High" ? 15 : sev === "Medium" ? 8 : sev === "Low" ? 3 : 5;
+    return s + p;
+  }, 0);
+  const casePenalty = policeCases.length * 10;
+  const overduePenalty = overdueDeductions.length * 5;
+  const totalPenalty = incidentPenalty + casePenalty + overduePenalty;
+  const score = Math.max(0, Math.min(100, 100 - totalPenalty));
+  const tier = scoreTier(score);
+
+  const stars = "★".repeat(tier.stars) + "☆".repeat(5 - tier.stars);
+
+  return (
+    <Card className="mt-5 p-4">
+      <div className="flex items-center gap-2">
+        <Award className="size-4 text-primary" />
+        <h2 className="font-semibold">Ranking</h2>
+      </div>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Score based on incidents, police cases and overdue deductions (last 12 months)
+      </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="flex items-baseline gap-2">
+          <span className={`text-4xl font-bold ${tier.tone}`}>{score}</span>
+          <span className="text-sm text-muted-foreground">/ 100</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-2xl leading-none ${tier.tone}`}>{stars}</span>
+          <span className={`text-sm font-medium ${tier.tone}`}>{tier.label}</span>
+        </div>
+      </div>
+
+      <dl className="mt-4 grid gap-x-6 gap-y-2 border-t pt-3 text-sm sm:grid-cols-2">
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-muted-foreground">
+            Incidents <span className="text-xs">({incidents.length})</span>
+          </dt>
+          <dd className={incidentPenalty > 0 ? "font-medium text-destructive" : "text-muted-foreground"}>
+            −{incidentPenalty}
+          </dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-muted-foreground">
+            Police cases <span className="text-xs">({policeCases.length})</span>
+          </dt>
+          <dd className={casePenalty > 0 ? "font-medium text-destructive" : "text-muted-foreground"}>
+            −{casePenalty}
+          </dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-muted-foreground">
+            Overdue deductions <span className="text-xs">({overdueDeductions.length})</span>
+          </dt>
+          <dd className={overduePenalty > 0 ? "font-medium text-destructive" : "text-muted-foreground"}>
+            −{overduePenalty}
+          </dd>
+        </div>
+        <div className="flex items-center justify-between gap-3 font-medium">
+          <dt>Total penalty</dt>
+          <dd className={totalPenalty > 0 ? "text-destructive" : "text-success"}>
+            −{totalPenalty}
+          </dd>
+        </div>
+      </dl>
+    </Card>
+  );
+}
+
 function DriverProfile() {
   const { driverId } = useParams({ from: "/_authenticated/drivers/$driverId" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["driver-profile", driverId],
     queryFn: async () => {
-      const [drivers, trips, payments, vehicles, tripFinancials, tripVehicles] = await Promise.all([
-        selectAll("drivers"),
-        selectAll("trips"),
-        selectAll("driver_payments"),
-        selectAll("vehicles"),
-        selectAll("trip_financials"),
-        selectAll("trip_vehicles"),
-      ]);
+      const [drivers, trips, payments, vehicles, tripFinancials, tripVehicles, incidents, policeCases, deductions] =
+        await Promise.all([
+          selectAll("drivers"),
+          selectAll("trips"),
+          selectAll("driver_payments"),
+          selectAll("vehicles"),
+          selectAll("trip_financials"),
+          selectAll("trip_vehicles"),
+          selectAll("incidents"),
+          selectAll("police_cases"),
+          selectAll("driver_deductions"),
+        ]);
 
       const driver = drivers.find((d: any) => String(d.id) === driverId) ?? null;
       const reg = new Map(vehicles.map((v: any) => [String(v.id), v.registration_number]));
@@ -117,7 +219,37 @@ function DriverProfile() {
         ? reg.get(String(driver.assigned_trailer_id)) ?? null
         : null;
 
-      return { driver, trips: ownTrips, payments: ownPayments, tripAdvances, assignedTruck, assignedTrailer };
+      // Ranking inputs (12-month window matches the SQL function)
+      const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+      const rankIncidents = incidents.filter((i: any) => {
+        if (String(i.driver_id) !== driverId) return false;
+        if (!i.occurred_at) return true;
+        return new Date(String(i.occurred_at)).getTime() >= twelveMonthsAgo;
+      });
+      const rankCases = policeCases.filter((c: any) => {
+        if (String(c.driver_id) !== driverId) return false;
+        if (!c.reported_on) return true;
+        return new Date(String(c.reported_on)).getTime() >= twelveMonthsAgo;
+      });
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const rankOverdue = deductions.filter((d: any) => {
+        if (String(d.driver_id) !== driverId) return false;
+        if (String(d.status) !== "Pending") return false;
+        if (!d.deduction_date) return false;
+        return new Date(String(d.deduction_date)).getTime() < thirtyDaysAgo;
+      });
+
+      return {
+        driver,
+        trips: ownTrips,
+        payments: ownPayments,
+        tripAdvances,
+        assignedTruck,
+        assignedTrailer,
+        rankIncidents,
+        rankCases,
+        rankOverdue,
+      };
     },
   });
 
@@ -156,7 +288,8 @@ function DriverProfile() {
 
   const licenceDays = daysUntil(d.licence_expiry);
   const passportDays = daysUntil(d.passport_expiry);
-  const hasExpiryWarning = (licenceDays !== null && licenceDays < 90) || (passportDays !== null && passportDays < 90);
+  const hasExpiryWarning =
+    (licenceDays !== null && licenceDays < 90) || (passportDays !== null && passportDays < 90);
 
   function openRecordPayment() {
     paymentEditor.openNew({
@@ -234,6 +367,12 @@ function DriverProfile() {
           tone="green"
         />
       </div>
+
+      <RankingCard
+        incidents={data.rankIncidents}
+        policeCases={data.rankCases}
+        overdueDeductions={data.rankOverdue}
+      />
 
       <Tabs defaultValue="details" className="mt-6">
         <div className="overflow-x-auto">
