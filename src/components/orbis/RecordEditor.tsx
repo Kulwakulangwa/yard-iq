@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import { db } from "@/lib/db";
@@ -75,6 +76,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   const [draft, setDraft] = useState<Row>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAllFields, setShowAllFields] = useState<Set<string>>(new Set());
+  const [lockedFields, setLockedFields] = useState<Set<string>>(new Set());
 
   const needsAvailability =
     config.table === "trips" ||
@@ -115,7 +117,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function openNew(defaults: Row = {}) {
+  function openNew(defaults: Row = {}, locks: string[] = []) {
     const isEvent =
       defaults &&
       typeof defaults === "object" &&
@@ -124,15 +126,17 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     setEditingId(null);
     setDraft(safeDefaults);
     setShowAllFields(new Set());
+    setLockedFields(new Set(locks));
     setOpen(true);
   }
 
-  function openEdit(row: Row) {
+  function openEdit(row: Row, locks: string[] = []) {
     setEditingId(String(row["id"]));
     const d: Row = {};
     for (const f of config.fields) d[f.key] = row[f.key] ?? "";
     setDraft(d);
     setShowAllFields(new Set());
+    setLockedFields(new Set(locks));
     setOpen(true);
   }
 
@@ -175,7 +179,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   }
 
   function setField(f: Field, value: unknown) {
-    // Pre-compute autoFill candidates outside setDraft.
+    if (lockedFields.has(f.key)) return;
     const autoFill: Record<string, unknown> = {};
     for (const other of config.fields) {
       if (!other.refRule || other.refRule.by !== f.key) continue;
@@ -195,34 +199,33 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     setDraft((d) => {
       const next: Row = { ...d, [f.key]: value };
 
-      // ─── Validate dependent fields when a pivot changes ───
+      // Clear invalid dependents
       for (const other of config.fields) {
+        if (lockedFields.has(other.key)) continue;
         if (!other.refRule || other.refRule.by !== f.key) continue;
         const current = next[other.key];
         if (!current || current === "") continue;
         const map = relatedIndex[other.refRule.resolve];
         const newSet = value ? map?.get(String(value)) : undefined;
-        // Only clear when the pivot has a valid set and the current value
-        // isn't in it. If pivot was cleared, leave the dependent alone.
         if (newSet && newSet.size > 0 && !newSet.has(String(current))) {
           next[other.key] = "";
         }
       }
 
-      // ─── autoFill only when the target is still empty ───
       for (const [k, v] of Object.entries(autoFill)) {
+        if (lockedFields.has(k)) continue;
         const current = next[k];
         const isEmpty = current === undefined || current === null || current === "";
         if (isEmpty || v === "") next[k] = v;
       }
 
-      // ─── Trip-specific cascades ───
       if (config.table === "trips") {
         if (f.key === "driver_id" && typeof value === "string") {
           const assignedTruck = availability.truckByDriver.get(value);
           if (
             assignedTruck &&
             !availability.busyTruckIds.has(assignedTruck) &&
+            !lockedFields.has("vehicle_id") &&
             (next["vehicle_id"] === "" || next["vehicle_id"] === null || next["vehicle_id"] === undefined)
           ) {
             next["vehicle_id"] = assignedTruck;
@@ -230,6 +233,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
             if (
               coupledTrailer &&
               !availability.busyTrailerIds.has(coupledTrailer) &&
+              !lockedFields.has("trailer_id") &&
               (next["trailer_id"] === "" || next["trailer_id"] === null || next["trailer_id"] === undefined)
             ) {
               next["trailer_id"] = coupledTrailer;
@@ -238,7 +242,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
         }
         if (f.key === "vehicle_id" && typeof value === "string") {
           const coupledTrailer = availability.trailerByTruck.get(value);
-          if (coupledTrailer && !availability.busyTrailerIds.has(coupledTrailer)) {
+          if (coupledTrailer && !availability.busyTrailerIds.has(coupledTrailer) && !lockedFields.has("trailer_id")) {
             next["trailer_id"] = coupledTrailer;
           }
         }
@@ -266,6 +270,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
             const id = `f-${f.key}`;
             const wide = f.type === "textarea";
             const showAll = showAllFields.has(f.key);
+            const isLocked = lockedFields.has(f.key);
 
             const baseOptions = (refs[f.refTable as RefTable] ?? []).filter((o) => {
               if (!f.refFilter) return true;
@@ -279,27 +284,38 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
 
             return (
               <div key={f.key} className={wide ? "sm:col-span-2" : undefined}>
-                <Label htmlFor={id} className="mb-1.5 block text-xs text-muted-foreground">
+                <Label htmlFor={id} className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                   {label}
+                  {isLocked ? (
+                    <span className="inline-flex items-center gap-0.5 rounded-full border border-muted-foreground/30 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium">
+                      <Lock className="size-2.5" /> fixed
+                    </span>
+                  ) : null}
                 </Label>
                 {f.type === "textarea" ? (
                   <Textarea
                     id={id}
                     value={String(value ?? "")}
                     onChange={(e) => setField(f, e.target.value)}
+                    readOnly={isLocked}
+                    className={isLocked ? "cursor-not-allowed opacity-70" : undefined}
                   />
                 ) : f.type === "boolean" ? (
                   <Switch
                     id={id}
                     checked={Boolean(value)}
                     onCheckedChange={(v) => setField(f, v)}
+                    disabled={isLocked}
                   />
                 ) : f.type === "select" ? (
                   <select
                     id={id}
                     value={String(value ?? "")}
                     onChange={(e) => setField(f, e.target.value)}
-                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    disabled={isLocked}
+                    className={`h-9 w-full rounded-md border border-input bg-background px-3 text-sm ${
+                      isLocked ? "cursor-not-allowed opacity-70" : ""
+                    }`}
                   >
                     <option value="">—</option>
                     {(f.options ?? []).filter(Boolean).map((o) => (
@@ -314,7 +330,10 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                       id={id}
                       value={String(value ?? "")}
                       onChange={(e) => setField(f, e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      disabled={isLocked}
+                      className={`h-9 w-full rounded-md border border-input bg-background px-3 text-sm ${
+                        isLocked ? "cursor-not-allowed opacity-70" : ""
+                      }`}
                     >
                       <option value="">—</option>
                       {baseOptions.map((o) => {
@@ -322,14 +341,13 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                         const busy = busyReason(f, o.id);
                         const unrelated = relevantSet ? !relevantSet.has(o.id) : false;
 
-                        // If a refRule applies, `unrelated` is the primary filter
-                        // and busy fade does not disable options (a related option
-                        // is supposed to be busy — it's on the trip you're citing).
-                        const disabled = isSelected
-                          ? false
-                          : relevantSet
-                            ? unrelated && !showAll
-                            : Boolean(busy);
+                        const disabled = isLocked
+                          ? !isSelected
+                          : isSelected
+                            ? false
+                            : relevantSet
+                              ? unrelated && !showAll
+                              : Boolean(busy);
 
                         const hint = relevantSet
                           ? unrelated && !showAll
@@ -347,7 +365,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                         );
                       })}
                     </select>
-                    {irrelevantCount > 0 ? (
+                    {!isLocked && irrelevantCount > 0 ? (
                       <button
                         type="button"
                         onClick={() =>
@@ -379,7 +397,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                             : "text"
                     }
                     value={String(value ?? "").slice(0, f.type === "datetime" ? 16 : undefined)}
-                    readOnly={f.readOnly === true}
+                    readOnly={f.readOnly === true || isLocked}
                     onChange={(e) =>
                       setField(
                         f,
@@ -390,6 +408,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                           : e.target.value,
                       )
                     }
+                    className={isLocked ? "cursor-not-allowed opacity-70" : undefined}
                   />
                 )}
               </div>
