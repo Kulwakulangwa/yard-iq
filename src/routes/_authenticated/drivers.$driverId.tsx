@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, ExternalLink, MapPin, Phone, Printer, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, MapPin, Phone, Printer, Truck, Wallet } from "lucide-react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
 import { modules } from "@/lib/modules";
 import { formatValue } from "@/lib/orbis";
 import { useRecordEditor } from "@/components/orbis/RecordEditor";
+import { DriverDeductionsTab } from "@/components/orbis/DriverDeductionsTab";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -145,6 +146,7 @@ function DriverProfile() {
   ).length;
   const primaryCount = data.trips.filter((t: any) => t.isPrimary).length;
   const convoyCount = data.trips.filter((t: any) => t.isConvoyOnly).length;
+  const totalAdvances = data.tripAdvances + extraAdvances;
 
   const ledger = [...data.payments].sort((a: any, b: any) =>
     String(b.payment_date ?? "").localeCompare(String(a.payment_date ?? "")),
@@ -243,6 +245,7 @@ function DriverProfile() {
             <TabsTrigger value="payments">
               Payments {data.payments.length > 0 ? <span className="ml-1.5 text-xs opacity-70">{data.payments.length}</span> : null}
             </TabsTrigger>
+            <TabsTrigger value="deductions">Deductions</TabsTrigger>
             <TabsTrigger value="documents">
               Documents {hasExpiryWarning ? <span className="ml-1.5 inline-block size-2 rounded-full bg-destructive" /> : null}
             </TabsTrigger>
@@ -283,21 +286,13 @@ function DriverProfile() {
               <div className="min-w-0 border-b p-4 sm:border-r">
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">Assigned truck</dt>
                 <dd className="mt-1 text-sm font-medium">
-                  {data.assignedTruck ? (
-                    <span>{data.assignedTruck}</span>
-                  ) : (
-                    <span className="text-muted-foreground">Not assigned</span>
-                  )}
+                  {data.assignedTruck ? <span>{data.assignedTruck}</span> : <span className="text-muted-foreground">Not assigned</span>}
                 </dd>
               </div>
               <div className="min-w-0 border-b p-4 sm:border-r">
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">Assigned trailer</dt>
                 <dd className="mt-1 text-sm font-medium">
-                  {data.assignedTrailer ? (
-                    <span>{data.assignedTrailer}</span>
-                  ) : (
-                    <span className="text-muted-foreground">Not assigned</span>
-                  )}
+                  {data.assignedTrailer ? <span>{data.assignedTrailer}</span> : <span className="text-muted-foreground">Not assigned</span>}
                 </dd>
               </div>
               {d.notes ? (
@@ -425,6 +420,11 @@ function DriverProfile() {
               </Table>
             </div>
           </Card>
+        </TabsContent>
+
+        {/* DEDUCTIONS */}
+        <TabsContent value="deductions" className="mt-4">
+          <DriverDeductionsTab driverId={driverId} advances={totalAdvances} />
         </TabsContent>
 
         {/* DOCUMENTS */}
