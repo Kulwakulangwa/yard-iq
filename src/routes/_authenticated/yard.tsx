@@ -15,6 +15,13 @@ export const Route = createFileRoute("/_authenticated/yard")({
 
 const db = supabase as never as { from: (t: string) => any };
 
+// Anything except "On Trip" is physically in the yard.
+const YARD_STATUSES = ["Available", "In Yard", "Loading", "In Maintenance", "On Hold"];
+
+function isInYard(v: any) {
+  return YARD_STATUSES.includes(String(v.status));
+}
+
 function YardDashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["yard-dashboard"],
@@ -42,7 +49,7 @@ function YardDashboard() {
 
   const today = new Date().toISOString().slice(0, 10);
   const d = data;
-  const inYard = d?.vehicles.filter((v) => ["In Yard", "Loading", "On Hold", "In Maintenance"].includes(v.status)) ?? [];
+  const inYard = (d?.vehicles ?? []).filter(isInYard);
   const gateToday = d?.gates.filter((g) => String(g.event_time ?? "").slice(0, 10) === today) ?? [];
 
   const byId = new Map((d?.vehicles ?? []).map((v) => [String(v.id), v]));
@@ -63,7 +70,10 @@ function YardDashboard() {
             <Stat label="Vehicles in yard" value={inYard.length} />
             <Stat label="Gate ins today" value={gateToday.filter((g) => g.direction === "In").length} />
             <Stat label="Gate outs today" value={gateToday.filter((g) => g.direction === "Out").length} />
-            <Stat label="Waiting to load" value={d?.vehicles.filter((v) => v.yard_zone === "Loading Bay").length ?? 0} />
+            <Stat
+              label="Waiting to load"
+              value={inYard.filter((v) => v.yard_zone === "Loading Bay").length}
+            />
             <Stat
               label="Loads awaiting verification"
               value={d?.loads.filter((l) => l.status === "Loaded").length ?? 0}
@@ -84,7 +94,11 @@ function YardDashboard() {
               value={d?.tires.filter((t) => ["Missing", "Disputed"].includes(t.status)).length ?? 0}
               tone="red"
             />
-            <Stat label="Vehicles on hold" value={d?.vehicles.filter((v) => v.status === "On Hold").length ?? 0} tone="red" />
+            <Stat
+              label="Vehicles on hold"
+              value={inYard.filter((v) => v.status === "On Hold").length}
+              tone="red"
+            />
           </div>
 
           <Card className="mt-5 p-4">
@@ -98,12 +112,13 @@ function YardDashboard() {
               {(d?.zones ?? []).map((z) => {
                 const trucksHere = inYard.filter((v) => v.yard_zone === z.name && !v.is_trailer);
                 const trailersHere = inYard.filter((v) => v.yard_zone === z.name && v.is_trailer);
+                const total = trucksHere.length + trailersHere.length;
                 return (
                   <div key={z.id} className="rounded-md border p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-sm font-medium">{z.name}</p>
                       <span className="text-xs text-muted-foreground">
-                        {trucksHere.length + trailersHere.length}
+                        {total}
                         {z.capacity ? ` / ${z.capacity}` : ""}
                       </span>
                     </div>
@@ -164,7 +179,7 @@ function YardDashboard() {
                       </div>
                     ) : null}
 
-                    {trucksHere.length === 0 && trailersHere.length === 0 ? (
+                    {total === 0 ? (
                       <p className="text-sm text-muted-foreground">Empty</p>
                     ) : null}
                   </div>
