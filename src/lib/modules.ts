@@ -17,6 +17,7 @@ export type RefResolveKey =
   | "trucksByTrip"
   | "trailersByTrip"
   | "driversByTrip"
+  | "driversByVehicle"
   | "loadsByTrip"
   | "tiresByVehicle";
 
@@ -461,6 +462,7 @@ export const modules = {
       { key: "severity", type: "select", options: ["Low", "Medium", "High", "Critical"] },
       { key: "occurred_at", type: "datetime" },
       { key: "location" },
+      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
       {
         key: "vehicle_id",
         label: "Vehicle",
@@ -473,9 +475,8 @@ export const modules = {
         label: "Driver",
         type: "ref",
         refTable: "drivers",
-        refRule: { by: "trip_id", resolve: "driversByTrip" },
+        refRule: { by: "vehicle_id", resolve: "driversByVehicle" },
       },
-      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
       {
         key: "load_id",
         label: "Load",
