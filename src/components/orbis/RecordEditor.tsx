@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { db } from "@/lib/db";
 import { REF_LABEL, type Field, type ModuleConfig, type RefTable } from "@/lib/modules";
 import { humanize, logAudit, nextReference } from "@/lib/orbis";
+import { useAvailability } from "@/lib/availability";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,6 @@ type RefOption = { id: string; label: string; [k: string]: unknown };
 export function useRefOptions(fields: Field[]) {
   const tables = [...new Set(fields.filter((f) => f.refTable).map((f) => f.refTable as RefTable))];
 
-  // Collect extra columns per table (from any field's refFilter key)
   const extraColumns: Record<string, string[]> = {};
   for (const f of fields) {
     if (!f.refTable || !f.refFilter) continue;
@@ -66,16 +66,24 @@ export function useRefOptions(fields: Field[]) {
   });
 }
 
-/**
- * Shared add/edit dialog for any module config. Returns the dialog element plus
- * handlers, so summary pages can reuse the same form as the generic tables.
- */
 export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   const qc = useQueryClient();
   const { data: refs = {} } = useRefOptions(config.fields);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Row>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Availability is only meaningful for modules that reference drivers/vehicles.
+  const needsAvailability =
+    config.table === "trips" ||
+    config.table === "fuel_allocations" ||
+    config.table === "vehicle_maintenance" ||
+    config.table === "work_orders" ||
+    config.table === "loads";
+
+  const availability = useAvailability({
+    excludeTripId: config.table === "trips" && editingId ? editingId : undefined,
+  });
 
   const save = useMutation({
     mutationFn: async (payload: Row) => {
@@ -106,10 +114,6 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   });
 
   function openNew(defaults: Row = {}) {
-    // Defensive: React calls onClick handlers with the click event as the
-    // first argument. When used as `<Button onClick={openNew}>`, `defaults`
-    // receives the event object — which carries DOM references that
-    // JSON.stringify chokes on. Treat it as "no defaults".
     const isEvent =
       defaults &&
       typeof defaults === "object" &&
@@ -133,6 +137,68 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     return refs[table]?.find((o) => o.id === String(id))?.label ?? "—";
   };
 
+  /** Is this ref option blocked? Returns the reason or null. */
+  function blockReason(f: Field, optionId: string): string | null {
+    if (!needsAvailability) return null;
+    if (f.refTable === "drivers") {
+      if (availability.busyDriverIds.has(optionId)) {
+        const trip = availability.busyReasonByDriverId.get(optionId);
+        return trip ? `On ${trip}` : "Busy";
+      }
+      return null;
+    }
+    if (f.refTable === "vehicles") {
+      const isTrailer = f.refFilter?.value === true;
+      if (isTrailer && availability.busyTrailerIds.has(optionId)) {
+        const reason = availability.busyReasonByVehicleId.get(optionId);
+        return reason ?? "Busy";
+      }
+      if (!isTrailer && availability.busyTruckIds.has(optionId)) {
+        const reason = availability.busyReasonByVehicleId.get(optionId);
+        return reason ?? "Busy";
+      }
+      return null;
+    }
+    return null;
+  }
+
+  /** Set a field, applying trip cascades if relevant. */
+  function setField(f: Field, value: unknown) {
+    setDraft((d) => {
+      const next = { ...d, [f.key]: value };
+      if (config.table === "trips") {
+        // Cascade 1: driver → assigned truck (if not already set or if it's changing)
+        if (f.key === "driver_id" && typeof value === "string") {
+          const assignedTruck = availability.truckByDriver.get(value);
+          if (
+            assignedTruck &&
+            !availability.busyTruckIds.has(assignedTruck) &&
+            (next["vehicle_id"] === "" || next["vehicle_id"] === null || next["vehicle_id"] === undefined)
+          ) {
+            next["vehicle_id"] = assignedTruck;
+            // Cascade 2: truck → coupled trailer
+            const coupledTrailer = availability.trailerByTruck.get(assignedTruck);
+            if (
+              coupledTrailer &&
+              !availability.busyTrailerIds.has(coupledTrailer) &&
+              (next["trailer_id"] === "" || next["trailer_id"] === null || next["trailer_id"] === undefined)
+            ) {
+              next["trailer_id"] = coupledTrailer;
+            }
+          }
+        }
+        // Cascade: truck → coupled trailer
+        if (f.key === "vehicle_id" && typeof value === "string") {
+          const coupledTrailer = availability.trailerByTruck.get(value);
+          if (coupledTrailer && !availability.busyTrailerIds.has(coupledTrailer)) {
+            next["trailer_id"] = coupledTrailer;
+          }
+        }
+      }
+      return next;
+    });
+  }
+
   const dialog = (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
@@ -148,7 +214,6 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
           {config.fields.map((f) => {
             const label = f.label ?? humanize(f.key);
             const value = draft[f.key];
-            const set = (v: unknown) => setDraft((d) => ({ ...d, [f.key]: v }));
             const id = `f-${f.key}`;
             const wide = f.type === "textarea";
             return (
@@ -157,14 +222,22 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                   {label}
                 </Label>
                 {f.type === "textarea" ? (
-                  <Textarea id={id} value={String(value ?? "")} onChange={(e) => set(e.target.value)} />
+                  <Textarea
+                    id={id}
+                    value={String(value ?? "")}
+                    onChange={(e) => setField(f, e.target.value)}
+                  />
                 ) : f.type === "boolean" ? (
-                  <Switch id={id} checked={Boolean(value)} onCheckedChange={set} />
+                  <Switch
+                    id={id}
+                    checked={Boolean(value)}
+                    onCheckedChange={(v) => setField(f, v)}
+                  />
                 ) : f.type === "select" ? (
                   <select
                     id={id}
                     value={String(value ?? "")}
-                    onChange={(e) => set(e.target.value)}
+                    onChange={(e) => setField(f, e.target.value)}
                     className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">—</option>
@@ -178,7 +251,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                   <select
                     id={id}
                     value={String(value ?? "")}
-                    onChange={(e) => set(e.target.value)}
+                    onChange={(e) => setField(f, e.target.value)}
                     className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">—</option>
@@ -187,11 +260,19 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                         if (!f.refFilter) return true;
                         return o[f.refFilter.key] === f.refFilter.value;
                       })
-                      .map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                        </option>
-                      ))}
+                      .map((o) => {
+                        const reason = blockReason(f, o.id);
+                        const isSelected = String(value ?? "") === o.id;
+                        // Keep the selected option selectable even if busy —
+                        // otherwise the user can't see what's currently set.
+                        const disabled = Boolean(reason) && !isSelected;
+                        return (
+                          <option key={o.id} value={o.id} disabled={disabled}>
+                            {o.label}
+                            {reason ? ` · ${reason}` : ""}
+                          </option>
+                        );
+                      })}
                   </select>
                 ) : (
                   <Input
@@ -208,7 +289,14 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                     value={String(value ?? "").slice(0, f.type === "datetime" ? 16 : undefined)}
                     readOnly={f.readOnly === true}
                     onChange={(e) =>
-                      set(f.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)
+                      setField(
+                        f,
+                        f.type === "number"
+                          ? e.target.value === ""
+                            ? ""
+                            : Number(e.target.value)
+                          : e.target.value,
+                      )
                     }
                   />
                 )}
