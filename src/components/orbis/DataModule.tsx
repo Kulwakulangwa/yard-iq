@@ -7,8 +7,7 @@ import { toast } from "sonner";
 import { db } from "@/lib/db";
 import { modules, type ModuleConfig } from "@/lib/modules";
 import { exportCsv, formatValue, humanize, logAudit } from "@/lib/orbis";
-import { dualDisplay } from "@/lib/money";
-import { useFxRate } from "@/lib/fx";
+import { syncTrucksForTrip } from "@/lib/tripStatusSync";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -27,26 +26,6 @@ import { ConvoyLegRows, useConvoyLegs } from "./ConvoyRows";
 import { useRecordEditor } from "./RecordEditor";
 
 type Row = Record<string, unknown>;
-
-/**
- * Money fields whose currency is stored on the record itself.
- * Only applies when the row has a `currency` or `contract_currency` column.
- */
-const CHOSEN_CURRENCY_KEYS = new Set([
-  "amount",
-  "tax",
-  "fuel_cost",
-  "contract_amount",
-  "cost",
-]);
-
-function moneyMode(key: string, row: Row): "chosen" | "tzs" | null {
-  if (CHOSEN_CURRENCY_KEYS.has(key) && ("currency" in row || "contract_currency" in row)) {
-    return "chosen";
-  }
-  if (key.endsWith("_tzs")) return "tzs";
-  return null;
-}
 
 export function useRows(table: string) {
   return useQuery({
@@ -67,7 +46,6 @@ export function DataModule({
   readOnlyNotice?: string;
 }) {
   const qc = useQueryClient();
-  const fx = useFxRate();
   const { data: rows = [], isLoading } = useRows(config.table);
   const { dialog, openNew, openEdit, refLabel } = useRecordEditor(config, rows);
   const [term, setTerm] = useState("");
@@ -91,6 +69,10 @@ export function DataModule({
         .update({ [config.statusKey as string]: value })
         .eq("id", id);
       if (error) throw error;
+      // Trips: propagate the status to trucks + coupled trailers
+      if (config.table === "trips") {
+        await syncTrucksForTrip(id, value);
+      }
       await logAudit("update", config.table, id, { [config.statusKey as string]: value });
     },
     onSuccess: () => {
@@ -126,35 +108,6 @@ export function DataModule({
 
   const colSpan = config.columns.length + 1;
 
-  function renderCell(c: string, row: Row) {
-    const field = config.fields.find((f) => f.key === c);
-
-    if (c === config.statusKey) {
-      return <StatusBadge value={row[c] ? String(row[c]) : null} />;
-    }
-    if (field?.type === "ref") {
-      return refLabel(field.refTable, row[c]);
-    }
-
-    const mode = moneyMode(c, row);
-    if (mode && field?.type === "number") {
-      const amount = Number(row[c] ?? 0);
-      const currency =
-        mode === "tzs"
-          ? "TZS"
-          : String(row["currency"] ?? row["contract_currency"] ?? "TZS");
-      const display = dualDisplay(amount, currency, fx);
-      return (
-        <div className="leading-tight">
-          <div className="font-medium">{display.primary}</div>
-          <div className="text-xs font-normal text-muted-foreground">{display.secondary}</div>
-        </div>
-      );
-    }
-
-    return formatValue(row[c]);
-  }
-
   return (
     <>
       <PageHeader
@@ -165,7 +118,7 @@ export function DataModule({
             <Button variant="outline" onClick={() => exportCsv(config.table, filtered, config.columns)}>
               <Download className="mr-1.5 size-4" /> Export
             </Button>
-            <Button onClick={openNew}>
+            <Button onClick={() => openNew()}>
               <Plus className="mr-1.5 size-4" /> New
             </Button>
           </>
@@ -239,17 +192,26 @@ export function DataModule({
                   return (
                     <React.Fragment key={id}>
                       <TableRow className="cursor-pointer">
-                        {config.columns.map((c) => (
-                          <TableCell key={c} className="whitespace-nowrap">
-                            {renderCell(c, row)}
-                            {isTrips && c === config.columns[0] && legs.length > 0 ? (
-                              <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-primary/40 px-2 py-0.5 text-[11px] text-primary">
-                                <Users className="size-3" />{" "}
-                                {legs.length === 1 ? "1 truck" : `${legs.length} trucks`}
-                              </span>
-                            ) : null}
-                          </TableCell>
-                        ))}
+                        {config.columns.map((c) => {
+                          const field = config.fields.find((f) => f.key === c);
+                          return (
+                            <TableCell key={c} className="whitespace-nowrap">
+                              {c === config.statusKey ? (
+                                <StatusBadge value={row[c] ? String(row[c]) : null} />
+                              ) : field?.type === "ref" ? (
+                                refLabel(field.refTable, row[c])
+                              ) : (
+                                formatValue(row[c])
+                              )}
+                              {isTrips && c === config.columns[0] && legs.length > 0 ? (
+                                <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-primary/40 px-2 py-0.5 text-[11px] text-primary">
+                                  <Users className="size-3" />{" "}
+                                  {legs.length === 1 ? "1 truck" : `${legs.length} trucks`}
+                                </span>
+                              ) : null}
+                            </TableCell>
+                          );
+                        })}
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
