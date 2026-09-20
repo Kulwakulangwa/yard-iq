@@ -194,7 +194,7 @@ export const modules = {
     fields: [
       { key: "load_reference", readOnly: true },
       { key: "customer_id", label: "Customer", type: "ref", refTable: "customers" },
-      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
+      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips", refRule: { by: "customer_id", resolve: "tripsByCustomer" } },
       { key: "cargo_description" },
       { key: "cargo_category" },
       { key: "expected_quantity", type: "number" },
@@ -355,8 +355,8 @@ export const modules = {
     fields: [
       { key: "invoice_number", readOnly: true },
       { key: "customer_id", label: "Customer", type: "ref", refTable: "customers" },
-      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
-      { key: "load_id", label: "Load", type: "ref", refTable: "loads" },
+      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips", refRule: { by: "customer_id", resolve: "tripsByCustomer" } },
+      { key: "load_id", label: "Load", type: "ref", refTable: "loads", refRule: { by: "trip_id", resolve: "loadsByTrip" } },
       { key: "amount", type: "number" },
       { key: "tax", type: "number" },
       { key: "currency" },
@@ -374,7 +374,7 @@ export const modules = {
     searchKeys: ["inspection_type", "inspector", "findings"],
     fields: [
       { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles" },
-      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips" },
+      { key: "trip_id", label: "Trip", type: "ref", refTable: "trips", refRule: { by: "vehicle_id", resolve: "tripsByVehicle" } },
       { key: "inspection_type", type: "select", options: ["Pre-trip", "Post-trip", "Gate", "Workshop"] },
       { key: "result", type: "select", options: ["Pass", "Fail", "Pass with defects"] },
       { key: "odometer", type: "number" },
