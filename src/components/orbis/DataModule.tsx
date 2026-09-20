@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Download, Eye, FileText, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
+import { Check, Download, Eye, FileText, MapPin, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -22,7 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "./AppShell";
 import { StatusBadge } from "./StatusBadge";
 import { ModuleStats } from "./ModuleStats";
-import { ConvoyLegRows, useConvoyLegs } from "./ConvoyRows";
+import { ConvoyLegRows, ago, useConvoyLegs } from "./ConvoyRows";
 import { useRecordEditor } from "./RecordEditor";
 
 type Row = Record<string, unknown>;
@@ -36,6 +36,30 @@ export function useRows(table: string) {
       return (data ?? []) as Row[];
     },
   });
+}
+
+function CurrentLocationCell({ row }: { row: Row }) {
+  const loc = row["current_location"] ? String(row["current_location"]) : "";
+  const at = row["current_location_at"] ? String(row["current_location_at"]) : "";
+  const by = row["current_location_by"] ? String(row["current_location_by"]) : "";
+
+  if (!loc) {
+    return <span className="text-xs text-muted-foreground">Not reported</span>;
+  }
+
+  return (
+    <div className="min-w-0 max-w-[200px]">
+      <div className="flex items-center gap-1.5">
+        <MapPin className="size-3.5 shrink-0 text-primary" />
+        <span className="truncate font-medium">{loc}</span>
+      </div>
+      <div className="ml-5 text-xs text-muted-foreground">
+        {at ? ago(at) : ""}
+        {at && by ? " · " : ""}
+        {by || ""}
+      </div>
+    </div>
+  );
 }
 
 export function DataModule({
@@ -69,7 +93,6 @@ export function DataModule({
         .update({ [config.statusKey as string]: value })
         .eq("id", id);
       if (error) throw error;
-      // Trips: propagate the status to trucks + coupled trailers
       if (config.table === "trips") {
         await syncTrucksForTrip(id, value);
       }
@@ -195,8 +218,10 @@ export function DataModule({
                         {config.columns.map((c) => {
                           const field = config.fields.find((f) => f.key === c);
                           return (
-                            <TableCell key={c} className="whitespace-nowrap">
-                              {c === config.statusKey ? (
+                            <TableCell key={c} className="whitespace-nowrap align-top">
+                              {isTrips && c === "current_location" ? (
+                                <CurrentLocationCell row={row} />
+                              ) : c === config.statusKey ? (
                                 <StatusBadge value={row[c] ? String(row[c]) : null} />
                               ) : field?.type === "ref" ? (
                                 refLabel(field.refTable, row[c])
