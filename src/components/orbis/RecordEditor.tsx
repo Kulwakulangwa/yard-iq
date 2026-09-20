@@ -199,7 +199,6 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     setDraft((d) => {
       const next: Row = { ...d, [f.key]: value };
 
-      // Clear invalid dependents
       for (const other of config.fields) {
         if (lockedFields.has(other.key)) continue;
         if (!other.refRule || other.refRule.by !== f.key) continue;
@@ -242,7 +241,11 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
         }
         if (f.key === "vehicle_id" && typeof value === "string") {
           const coupledTrailer = availability.trailerByTruck.get(value);
-          if (coupledTrailer && !availability.busyTrailerIds.has(coupledTrailer) && !lockedFields.has("trailer_id")) {
+          if (
+            coupledTrailer &&
+            !availability.busyTrailerIds.has(coupledTrailer) &&
+            !lockedFields.has("trailer_id")
+          ) {
             next["trailer_id"] = coupledTrailer;
           }
         }
@@ -284,7 +287,10 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
 
             return (
               <div key={f.key} className={wide ? "sm:col-span-2" : undefined}>
-                <Label htmlFor={id} className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Label
+                  htmlFor={id}
+                  className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground"
+                >
                   {label}
                   {isLocked ? (
                     <span className="inline-flex items-center gap-0.5 rounded-full border border-muted-foreground/30 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium">
