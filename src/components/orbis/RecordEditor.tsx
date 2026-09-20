@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { REF_LABEL, type Field, type ModuleConfig, type RefTable } from "@/lib/modules";
 import { humanize, logAudit, nextReference } from "@/lib/orbis";
 import { useAvailability } from "@/lib/availability";
+import { useRelatedIndex } from "@/lib/relatedIndex";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,11 +70,13 @@ export function useRefOptions(fields: Field[]) {
 export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
   const qc = useQueryClient();
   const { data: refs = {} } = useRefOptions(config.fields);
+  const relatedIndex = useRelatedIndex();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Row>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Field keys whose "Show all" toggle is on (unlocks unrelated options)
+  const [showAllFields, setShowAllFields] = useState<Set<string>>(new Set());
 
-  // Availability is only meaningful for modules that reference drivers/vehicles.
   const needsAvailability =
     config.table === "trips" ||
     config.table === "fuel_allocations" ||
@@ -121,6 +124,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     const safeDefaults: Row = isEvent ? {} : defaults;
     setEditingId(null);
     setDraft(safeDefaults);
+    setShowAllFields(new Set());
     setOpen(true);
   }
 
@@ -129,6 +133,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     const d: Row = {};
     for (const f of config.fields) d[f.key] = row[f.key] ?? "";
     setDraft(d);
+    setShowAllFields(new Set());
     setOpen(true);
   }
 
@@ -137,8 +142,8 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     return refs[table]?.find((o) => o.id === String(id))?.label ?? "—";
   };
 
-  /** Is this ref option blocked? Returns the reason or null. */
-  function blockReason(f: Field, optionId: string): string | null {
+  /** Reasons a busy option is blocked (hard block, never overridable). */
+  function busyReason(f: Field, optionId: string): string | null {
     if (!needsAvailability) return null;
     if (f.refTable === "drivers") {
       if (availability.busyDriverIds.has(optionId)) {
@@ -150,24 +155,61 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     if (f.refTable === "vehicles") {
       const isTrailer = f.refFilter?.value === true;
       if (isTrailer && availability.busyTrailerIds.has(optionId)) {
-        const reason = availability.busyReasonByVehicleId.get(optionId);
-        return reason ?? "Busy";
+        return availability.busyReasonByVehicleId.get(optionId) ?? "Busy";
       }
       if (!isTrailer && availability.busyTruckIds.has(optionId)) {
-        const reason = availability.busyReasonByVehicleId.get(optionId);
-        return reason ?? "Busy";
+        return availability.busyReasonByVehicleId.get(optionId) ?? "Busy";
       }
       return null;
     }
     return null;
   }
 
-  /** Set a field, applying trip cascades if relevant. */
+  /**
+   * Compute which options are unrelated to the current pivot for a given field.
+   * Returns null when the rule doesn't apply (no rule, no pivot, no data).
+   */
+  function unrelatedSet(f: Field): Set<string> | null {
+    if (!f.refRule) return null;
+    const pivotValue = draft[f.refRule.by];
+    if (!pivotValue || pivotValue === "") return null;
+    const map = relatedIndex[f.refRule.resolve];
+    if (!map) return null;
+    const set = map.get(String(pivotValue));
+    if (!set || set.size === 0) return null;
+    return set;
+  }
+
   function setField(f: Field, value: unknown) {
+    // Pre-compute autoFill candidates outside setDraft (cleaner, no stale closures).
+    const autoFill: Record<string, unknown> = {};
+    for (const other of config.fields) {
+      if (!other.refRule || other.refRule.by !== f.key) continue;
+      if (!other.refRule.autoFill) continue;
+      if (!value || value === "") {
+        autoFill[other.key] = "";
+        continue;
+      }
+      const map = relatedIndex[other.refRule.resolve];
+      const set = map?.get(String(value));
+      if (!set || set.size === 0) continue;
+      const opts = refs[other.refTable as RefTable] ?? [];
+      const firstMatch = opts.find((o) => set.has(o.id));
+      if (firstMatch) autoFill[other.key] = firstMatch.id;
+    }
+
     setDraft((d) => {
-      const next = { ...d, [f.key]: value };
+      const next: Row = { ...d, [f.key]: value };
+
+      // Apply refRule autoFill — only when the target is currently empty
+      for (const [k, v] of Object.entries(autoFill)) {
+        const current = next[k];
+        const isEmpty = current === undefined || current === null || current === "";
+        if (isEmpty || v === "") next[k] = v;
+      }
+
+      // Trip-specific cascades (driver → truck → coupled trailer)
       if (config.table === "trips") {
-        // Cascade 1: driver → assigned truck (if not already set or if it's changing)
         if (f.key === "driver_id" && typeof value === "string") {
           const assignedTruck = availability.truckByDriver.get(value);
           if (
@@ -176,7 +218,6 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
             (next["vehicle_id"] === "" || next["vehicle_id"] === null || next["vehicle_id"] === undefined)
           ) {
             next["vehicle_id"] = assignedTruck;
-            // Cascade 2: truck → coupled trailer
             const coupledTrailer = availability.trailerByTruck.get(assignedTruck);
             if (
               coupledTrailer &&
@@ -187,7 +228,6 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
             }
           }
         }
-        // Cascade: truck → coupled trailer
         if (f.key === "vehicle_id" && typeof value === "string") {
           const coupledTrailer = availability.trailerByTruck.get(value);
           if (coupledTrailer && !availability.busyTrailerIds.has(coupledTrailer)) {
@@ -195,6 +235,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
           }
         }
       }
+
       return next;
     });
   }
@@ -216,6 +257,20 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
             const value = draft[f.key];
             const id = `f-${f.key}`;
             const wide = f.type === "textarea";
+            const showAll = showAllFields.has(f.key);
+
+            // Base options (before rule)
+            const baseOptions = (refs[f.refTable as RefTable] ?? []).filter((o) => {
+              if (!f.refFilter) return true;
+              return o[f.refFilter.key] === f.refFilter.value;
+            });
+
+            // refRule context
+            const relevantSet = unrelatedSet(f);
+            const irrelevantCount = relevantSet
+              ? baseOptions.filter((o) => !relevantSet.has(o.id)).length
+              : 0;
+
             return (
               <div key={f.key} className={wide ? "sm:col-span-2" : undefined}>
                 <Label htmlFor={id} className="mb-1.5 block text-xs text-muted-foreground">
@@ -248,32 +303,53 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                     ))}
                   </select>
                 ) : f.type === "ref" ? (
-                  <select
-                    id={id}
-                    value={String(value ?? "")}
-                    onChange={(e) => setField(f, e.target.value)}
-                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="">—</option>
-                    {(refs[f.refTable as RefTable] ?? [])
-                      .filter((o) => {
-                        if (!f.refFilter) return true;
-                        return o[f.refFilter.key] === f.refFilter.value;
-                      })
-                      .map((o) => {
-                        const reason = blockReason(f, o.id);
+                  <>
+                    <select
+                      id={id}
+                      value={String(value ?? "")}
+                      onChange={(e) => setField(f, e.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="">—</option>
+                      {baseOptions.map((o) => {
                         const isSelected = String(value ?? "") === o.id;
-                        // Keep the selected option selectable even if busy —
-                        // otherwise the user can't see what's currently set.
-                        const disabled = Boolean(reason) && !isSelected;
+                        const busy = busyReason(f, o.id);
+                        const unrelated = relevantSet ? !relevantSet.has(o.id) : false;
+                        const disabled =
+                          (!isSelected && Boolean(busy)) ||
+                          (!isSelected && unrelated && !showAll);
+                        const hint = busy
+                          ? ` · ${busy}`
+                          : unrelated && !showAll
+                            ? " · unrelated"
+                            : "";
                         return (
                           <option key={o.id} value={o.id} disabled={disabled}>
                             {o.label}
-                            {reason ? ` · ${reason}` : ""}
+                            {hint}
                           </option>
                         );
                       })}
-                  </select>
+                    </select>
+                    {irrelevantCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowAllFields((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(f.key)) next.delete(f.key);
+                            else next.add(f.key);
+                            return next;
+                          })
+                        }
+                        className="mt-1 text-xs text-primary hover:underline"
+                      >
+                        {showAll
+                          ? `Hide ${irrelevantCount} unrelated option${irrelevantCount === 1 ? "" : "s"}`
+                          : `Show ${irrelevantCount} unrelated option${irrelevantCount === 1 ? "" : "s"}`}
+                      </button>
+                    ) : null}
+                  </>
                 ) : (
                   <Input
                     id={id}
