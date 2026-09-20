@@ -1,14 +1,16 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, MapPin, Phone, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ExternalLink, MapPin, Phone, Printer, Truck, Wallet } from "lucide-react";
 
 import { selectAll } from "@/lib/db";
 import { sum, tzs } from "@/lib/money";
 import { modules } from "@/lib/modules";
+import { formatValue } from "@/lib/orbis";
 import { useRecordEditor } from "@/components/orbis/RecordEditor";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { StatusBadge } from "@/components/orbis/StatusBadge";
 import { Stat } from "@/components/orbis/Stat";
@@ -26,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/drivers/$driverId")({
 });
 
 function formatDate(value: unknown) {
-  if (!value) return "";
+  if (!value) return "—";
   const d = new Date(String(value));
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -36,48 +38,26 @@ function daysUntil(value: unknown): number | null {
   if (!value) return null;
   const d = new Date(String(value));
   if (Number.isNaN(d.getTime())) return null;
-  const diff = d.getTime() - Date.now();
-  return Math.round(diff / (1000 * 60 * 60 * 24));
+  return Math.round((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-function PassportChip({
-  number,
-  expiry,
-}: {
-  number: string | null | undefined;
-  expiry: string | null | undefined;
-}) {
-  if (!number && !expiry) return null;
-  const days = daysUntil(expiry);
-  const tone =
-    days === null
-      ? "text-muted-foreground"
-      : days < 0
-        ? "text-destructive"
-        : days < 90
-          ? "text-warning-foreground"
-          : "text-muted-foreground";
-  const hint =
-    days === null
-      ? ""
-      : days < 0
-        ? ` — expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago`
-        : days < 90
-          ? ` — expires in ${days} day${days === 1 ? "" : "s"}`
-          : "";
-  return (
-    <span className={`inline-flex items-center gap-1.5 ${tone}`}>
-      <span className="text-xs font-semibold uppercase tracking-wide">Passport</span>
-      {number ? <span>{number}</span> : null}
-      {expiry ? (
-        <span>
-          · expires {formatDate(expiry)}
-          {hint}
-        </span>
-      ) : null}
-      {days !== null && days < 90 ? <AlertTriangle className="size-3.5" /> : null}
-    </span>
-  );
+function ExpiryBadge({ days }: { days: number | null }) {
+  if (days === null) return <span className="text-muted-foreground">—</span>;
+  if (days < 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs font-medium text-destructive">
+        <AlertTriangle className="size-3" /> Expired {Math.abs(days)}d ago
+      </span>
+    );
+  }
+  if (days < 90) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/5 px-2 py-0.5 text-xs font-medium text-warning-foreground">
+        <AlertTriangle className="size-3" /> {days}d left
+      </span>
+    );
+  }
+  return <span className="text-xs text-muted-foreground">{days}d left</span>;
 }
 
 function DriverProfile() {
@@ -109,9 +89,7 @@ function DriverProfile() {
       }
 
       const ownTrips = trips
-        .filter(
-          (t: any) => String(t.driver_id) === driverId || convoyByTrip.has(String(t.id)),
-        )
+        .filter((t: any) => String(t.driver_id) === driverId || convoyByTrip.has(String(t.id)))
         .map((t: any) => {
           const isPrimary = String(t.driver_id) === driverId;
           const convoyLegs = convoyByTrip.get(String(t.id)) ?? [];
@@ -131,7 +109,6 @@ function DriverProfile() {
       const tripAdvances = ownTrips.reduce((s: number, t: any) => s + t.advance, 0);
       const ownPayments = payments.filter((p: any) => String(p.driver_id) === driverId);
 
-      // Assigned truck/trailer regs
       const assignedTruck = driver?.assigned_vehicle_id
         ? reg.get(String(driver.assigned_vehicle_id)) ?? null
         : null;
@@ -139,14 +116,7 @@ function DriverProfile() {
         ? reg.get(String(driver.assigned_trailer_id)) ?? null
         : null;
 
-      return {
-        driver,
-        trips: ownTrips,
-        payments: ownPayments,
-        tripAdvances,
-        assignedTruck,
-        assignedTrailer,
-      };
+      return { driver, trips: ownTrips, payments: ownPayments, tripAdvances, assignedTruck, assignedTrailer };
     },
   });
 
@@ -167,20 +137,11 @@ function DriverProfile() {
 
   const d: any = data.driver;
 
-  const salary = sum(
-    data.payments.filter((p: any) => p.payment_type === "Salary"),
-    (p: any) => p.amount_tzs,
-  );
-  const extraAdvances = sum(
-    data.payments.filter((p: any) => p.payment_type === "Advance"),
-    (p: any) => p.amount_tzs,
-  );
-  const bonuses = sum(
-    data.payments.filter((p: any) => p.payment_type === "Bonus"),
-    (p: any) => p.amount_tzs,
-  );
+  const salary = sum(data.payments.filter((p: any) => p.payment_type === "Salary"), (p: any) => p.amount_tzs);
+  const extraAdvances = sum(data.payments.filter((p: any) => p.payment_type === "Advance"), (p: any) => p.amount_tzs);
+  const bonuses = sum(data.payments.filter((p: any) => p.payment_type === "Bonus"), (p: any) => p.amount_tzs);
   const activeTrips = data.trips.filter((t: any) =>
-    ["Dispatched", "In Transit", "In Yard"].includes(String(t.status)),
+    ["Dispatched", "In Transit", "In Yard", "At Border"].includes(String(t.status)),
   ).length;
   const primaryCount = data.trips.filter((t: any) => t.isPrimary).length;
   const convoyCount = data.trips.filter((t: any) => t.isConvoyOnly).length;
@@ -190,6 +151,10 @@ function DriverProfile() {
   );
 
   const monthlySalary = Number(d.monthly_salary_tzs ?? 0);
+
+  const licenceDays = daysUntil(d.licence_expiry);
+  const passportDays = daysUntil(d.passport_expiry);
+  const hasExpiryWarning = (licenceDays !== null && licenceDays < 90) || (passportDays !== null && passportDays < 90);
 
   function openRecordPayment() {
     paymentEditor.openNew({
@@ -210,15 +175,18 @@ function DriverProfile() {
 
       <PageHeader
         title={String(d.full_name ?? "Driver")}
-        subtitle={
-          [d.driver_code, d.licence_number ? `licence ${d.licence_number}` : null]
-            .filter(Boolean)
-            .join(" · ") || "—"
-        }
+        subtitle={[d.driver_code, d.licence_number ? `licence ${d.licence_number}` : null].filter(Boolean).join(" · ") || "—"}
         actions={
-          <Button onClick={openRecordPayment}>
-            <Wallet className="size-4" /> Record payment
-          </Button>
+          <>
+            <Button variant="outline" asChild>
+              <Link to="/voucher" search={{ driver: driverId }}>
+                <Printer className="size-4" /> Print voucher
+              </Link>
+            </Button>
+            <Button onClick={openRecordPayment}>
+              <Wallet className="size-4" /> Record payment
+            </Button>
+          </>
         }
       />
 
@@ -241,7 +209,11 @@ function DriverProfile() {
             {data.assignedTrailer ? <span>+ {data.assignedTrailer}</span> : null}
           </span>
         ) : null}
-        <PassportChip number={d.passport_number} expiry={d.passport_expiry} />
+        {hasExpiryWarning ? (
+          <span className="inline-flex items-center gap-1 text-warning-foreground">
+            <AlertTriangle className="size-3.5" /> Document expiring soon
+          </span>
+        ) : null}
         <StatusBadge value={d.status} />
       </div>
 
@@ -249,145 +221,248 @@ function DriverProfile() {
         <Stat
           label="Trips"
           value={data.trips.length}
-          sub={
-            convoyCount > 0
-              ? `${primaryCount} primary · ${convoyCount} convoy · ${activeTrips} active`
-              : `${activeTrips} active`
-          }
+          sub={convoyCount > 0 ? `${primaryCount} primary · ${convoyCount} convoy · ${activeTrips} active` : `${activeTrips} active`}
         />
-        <Stat
-          label="Trip advances"
-          value={tzs(data.tripAdvances)}
-          sub="Paid on dispatch"
-          tone="amber"
-        />
-        <Stat
-          label="Extra advances"
-          value={tzs(extraAdvances)}
-          sub="Outside contracts"
-        />
+        <Stat label="Trip advances" value={tzs(data.tripAdvances)} sub="Paid on dispatch" tone="amber" />
+        <Stat label="Extra advances" value={tzs(extraAdvances)} sub="Outside contracts" />
         <Stat
           label="Salary paid"
           value={tzs(salary)}
-          sub={
-            monthlySalary > 0
-              ? `Monthly ${tzs(monthlySalary)}`
-              : `${data.payments.length} payment${data.payments.length === 1 ? "" : "s"}`
-          }
+          sub={monthlySalary > 0 ? `Monthly ${tzs(monthlySalary)}` : `${data.payments.length} payment${data.payments.length === 1 ? "" : "s"}`}
           tone="green"
         />
       </div>
 
-      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <Card className="overflow-hidden">
-          <div className="border-b px-4 py-3">
-            <h2 className="font-semibold">Trips driven</h2>
-            <p className="text-sm text-muted-foreground">
-              Trips where this driver is primary or on a convoy leg.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Trip</TableHead>
-                  <TableHead>Route</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Advance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.trips.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4}>No trips recorded.</TableCell>
-                  </TableRow>
-                ) : (
-                  data.trips.map((t: any) => (
-                    <TableRow key={String(t.id)}>
-                      <TableCell className="whitespace-nowrap font-medium">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {t.trip_number ?? "—"}
-                          {t.isConvoyOnly ? (
-                            <span className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                              Convoy
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-xs font-normal text-muted-foreground">
-                          {t.isConvoyOnly && t.convoyVehicle ? t.convoyVehicle : t.vehicle}
-                        </div>
-                      </TableCell>
-                      <TableCell className="min-w-0">
-                        <div className="truncate">
-                          {t.origin ?? "—"} → {t.destination ?? "—"}
-                        </div>
-                        {t.planned_distance ? (
-                          <div className="text-xs text-muted-foreground">
-                            {Number(t.planned_distance).toLocaleString()} km
-                          </div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge value={t.status} />
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right font-medium">
-                        {t.advance > 0 ? tzs(t.advance) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+      <Tabs defaultValue="details" className="mt-6">
+        <div className="overflow-x-auto">
+          <TabsList className="w-max">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="trips">
+              Trips {data.trips.length > 0 ? <span className="ml-1.5 text-xs opacity-70">{data.trips.length}</span> : null}
+            </TabsTrigger>
+            <TabsTrigger value="payments">
+              Payments {data.payments.length > 0 ? <span className="ml-1.5 text-xs opacity-70">{data.payments.length}</span> : null}
+            </TabsTrigger>
+            <TabsTrigger value="documents">
+              Documents {hasExpiryWarning ? <span className="ml-1.5 inline-block size-2 rounded-full bg-destructive" /> : null}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-            <div>
-              <h2 className="font-semibold">Payment ledger</h2>
+        {/* DETAILS */}
+        <TabsContent value="details" className="mt-4">
+          <Card className="overflow-hidden">
+            <div className="border-b px-4 py-3">
+              <h2 className="font-semibold">Driver details</h2>
+              <p className="text-sm text-muted-foreground">Complete information for this driver.</p>
+            </div>
+            <dl className="grid sm:grid-cols-2 xl:grid-cols-3">
+              {(
+                [
+                  ["full_name", "Full name"],
+                  ["driver_code", "Driver code"],
+                  ["phone", "Phone"],
+                  ["base_location", "Base location"],
+                  ["status", "Status"],
+                  ["monthly_salary_tzs", "Monthly salary (TZS)"],
+                ] as [string, string][]
+              ).map(([key, label]) => (
+                <div key={key} className="min-w-0 border-b p-4 sm:border-r">
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+                  <dd className="mt-1 break-words text-sm font-medium">
+                    {key === "status" ? (
+                      <StatusBadge value={String(d[key] ?? "")} />
+                    ) : key === "monthly_salary_tzs" ? (
+                      tzs(d[key])
+                    ) : (
+                      formatValue(d[key])
+                    )}
+                  </dd>
+                </div>
+              ))}
+              <div className="min-w-0 border-b p-4 sm:border-r">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Assigned truck</dt>
+                <dd className="mt-1 text-sm font-medium">
+                  {data.assignedTruck ? (
+                    <span>{data.assignedTruck}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Not assigned</span>
+                  )}
+                </dd>
+              </div>
+              <div className="min-w-0 border-b p-4 sm:border-r">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Assigned trailer</dt>
+                <dd className="mt-1 text-sm font-medium">
+                  {data.assignedTrailer ? (
+                    <span>{data.assignedTrailer}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Not assigned</span>
+                  )}
+                </dd>
+              </div>
+              {d.notes ? (
+                <div className="min-w-0 border-b p-4 sm:col-span-2 xl:col-span-3">
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Notes</dt>
+                  <dd className="mt-1 whitespace-pre-wrap text-sm">{String(d.notes)}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </Card>
+        </TabsContent>
+
+        {/* TRIPS */}
+        <TabsContent value="trips" className="mt-4">
+          <Card className="overflow-hidden">
+            <div className="border-b px-4 py-3">
+              <h2 className="font-semibold">Trips driven</h2>
               <p className="text-sm text-muted-foreground">
-                {data.payments.length} entr{data.payments.length === 1 ? "y" : "ies"}
-                {bonuses > 0 ? ` · ${tzs(bonuses)} bonus` : ""}
+                Trips where this driver is primary or on a convoy leg.
               </p>
             </div>
-            <Button size="sm" onClick={openRecordPayment}>
-              <Wallet className="size-4" /> Record payment
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ledger.length === 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={3}>No payments recorded.</TableCell>
+                    <TableHead>Trip</TableHead>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Advance</TableHead>
                   </TableRow>
-                ) : (
-                  ledger.map((p: any) => (
-                    <TableRow key={String(p.id)}>
-                      <TableCell className="whitespace-nowrap">
-                        {String(p.payment_date ?? "—").slice(0, 10)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge value={p.payment_type} />
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right font-medium">
-                        {tzs(p.amount_tzs)}
-                      </TableCell>
+                </TableHeader>
+                <TableBody>
+                  {data.trips.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>No trips recorded.</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      </div>
+                  ) : (
+                    data.trips.map((t: any) => (
+                      <TableRow key={String(t.id)}>
+                        <TableCell className="whitespace-nowrap font-medium">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {t.trip_number ?? "—"}
+                            {t.isConvoyOnly ? (
+                              <span className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                Convoy
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="text-xs font-normal text-muted-foreground">
+                            {t.isConvoyOnly && t.convoyVehicle ? t.convoyVehicle : t.vehicle}
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-0">
+                          <div className="truncate">
+                            {t.origin ?? "—"} → {t.destination ?? "—"}
+                          </div>
+                          {t.planned_distance ? (
+                            <div className="text-xs text-muted-foreground">
+                              {Number(t.planned_distance).toLocaleString()} km
+                            </div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge value={t.status} />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-right font-medium">
+                          {t.advance > 0 ? tzs(t.advance) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+
+        {/* PAYMENTS */}
+        <TabsContent value="payments" className="mt-4">
+          <Card className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+              <div>
+                <h2 className="font-semibold">Payment ledger</h2>
+                <p className="text-sm text-muted-foreground">
+                  {data.payments.length} entr{data.payments.length === 1 ? "y" : "ies"}
+                  {bonuses > 0 ? ` · ${tzs(bonuses)} bonus` : ""}
+                </p>
+              </div>
+              <Button size="sm" onClick={openRecordPayment}>
+                <Wallet className="size-4" /> Record payment
+              </Button>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ledger.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5}>No payments recorded.</TableCell>
+                    </TableRow>
+                  ) : (
+                    ledger.map((p: any) => (
+                      <TableRow key={String(p.id)}>
+                        <TableCell className="whitespace-nowrap">{formatDate(p.payment_date)}</TableCell>
+                        <TableCell>
+                          <StatusBadge value={p.payment_type} />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{p.period_label ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{p.notes ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right font-medium">
+                          {tzs(p.amount_tzs)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+
+        {/* DOCUMENTS */}
+        <TabsContent value="documents" className="mt-4">
+          <Card className="overflow-hidden">
+            <div className="border-b px-4 py-3">
+              <h2 className="font-semibold">Documents</h2>
+              <p className="text-sm text-muted-foreground">
+                Licences, passports and expiry warnings.
+              </p>
+            </div>
+            <dl className="grid sm:grid-cols-2 xl:grid-cols-3">
+              <div className="min-w-0 border-b p-4 sm:border-r">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Licence number</dt>
+                <dd className="mt-1 text-sm font-medium">{String(d.licence_number ?? "—")}</dd>
+              </div>
+              <div className="min-w-0 border-b p-4 sm:border-r">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Licence expiry</dt>
+                <dd className="mt-1 flex items-center gap-2 text-sm font-medium">
+                  <span>{formatDate(d.licence_expiry)}</span>
+                  <ExpiryBadge days={licenceDays} />
+                </dd>
+              </div>
+              <div className="min-w-0 border-b p-4">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Passport number</dt>
+                <dd className="mt-1 text-sm font-medium">{String(d.passport_number ?? "—")}</dd>
+              </div>
+              <div className="min-w-0 border-b p-4 sm:border-r">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Passport expiry</dt>
+                <dd className="mt-1 flex items-center gap-2 text-sm font-medium">
+                  <span>{formatDate(d.passport_expiry)}</span>
+                  <ExpiryBadge days={passportDays} />
+                </dd>
+              </div>
+            </dl>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {paymentEditor.dialog}
     </>
