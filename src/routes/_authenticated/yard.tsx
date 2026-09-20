@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { Link2 } from "lucide-react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { StatusBadge } from "@/components/orbis/StatusBadge";
-import { Stat } from "./dashboard";
+import { Stat } from "@/components/orbis/Stat";
 
 export const Route = createFileRoute("/_authenticated/yard")({
   head: () => ({ meta: [{ title: "Yard Dashboard — Orbis Logistics" }] }),
@@ -42,6 +44,13 @@ function YardDashboard() {
   const d = data;
   const inYard = d?.vehicles.filter((v) => ["In Yard", "Loading", "On Hold", "In Maintenance"].includes(v.status)) ?? [];
   const gateToday = d?.gates.filter((g) => String(g.event_time ?? "").slice(0, 10) === today) ?? [];
+
+  const byId = new Map((d?.vehicles ?? []).map((v) => [String(v.id), v]));
+  const partnerLabel = (v: any) => {
+    if (!v?.coupled_to_id) return null;
+    const partner = byId.get(String(v.coupled_to_id));
+    return partner?.registration_number ?? null;
+  };
 
   return (
     <>
@@ -87,19 +96,77 @@ function YardDashboard() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(d?.zones ?? []).map((z) => {
-                const list = inYard.filter((v) => v.yard_zone === z.name);
+                const trucksHere = inYard.filter((v) => v.yard_zone === z.name && !v.is_trailer);
+                const trailersHere = inYard.filter((v) => v.yard_zone === z.name && v.is_trailer);
                 return (
                   <div key={z.id} className="rounded-md border p-3">
-                    <p className="text-sm font-medium">{z.name}</p>
-                    <p className="text-xs text-muted-foreground">{list.length} vehicle(s)</p>
-                    <ul className="mt-2 space-y-1">
-                      {list.map((v) => (
-                        <li key={v.id} className="flex items-center justify-between text-sm">
-                          <span>{v.registration_number}</span>
-                          <StatusBadge value={v.status} />
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-medium">{z.name}</p>
+                      <span className="text-xs text-muted-foreground">
+                        {trucksHere.length + trailersHere.length}
+                        {z.capacity ? ` / ${z.capacity}` : ""}
+                      </span>
+                    </div>
+
+                    {trucksHere.length > 0 ? (
+                      <div className="mb-2">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Trucks
+                        </p>
+                        <ul className="space-y-1">
+                          {trucksHere.map((v) => {
+                            const partner = partnerLabel(v);
+                            return (
+                              <li key={v.id} className="flex items-center justify-between gap-2 text-sm">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <span className="font-medium">{v.registration_number}</span>
+                                  {partner ? (
+                                    <span className="inline-flex items-center gap-0.5 text-xs text-primary">
+                                      <Link2 className="size-3" />
+                                      {partner}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <StatusBadge value={v.status} />
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {trailersHere.length > 0 ? (
+                      <div>
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Trailers
+                        </p>
+                        <ul className="space-y-1">
+                          {trailersHere.map((v) => {
+                            const partner = partnerLabel(v);
+                            return (
+                              <li key={v.id} className="flex items-center justify-between gap-2 text-sm">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <span className="font-medium">{v.registration_number}</span>
+                                  {partner ? (
+                                    <span className="inline-flex items-center gap-0.5 text-xs text-primary">
+                                      <Link2 className="size-3" />
+                                      {partner}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">free</span>
+                                  )}
+                                </div>
+                                <StatusBadge value={v.status} />
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {trucksHere.length === 0 && trailersHere.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Empty</p>
+                    ) : null}
                   </div>
                 );
               })}
