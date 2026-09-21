@@ -29,6 +29,10 @@ const PAYMENT_METHODS = [
   "Other",
 ];
 
+// Statuses the user can still edit. Once finance moves the linked
+// expense to Approved / Paid / Rejected, the fuel row is locked.
+const EDITABLE_FUEL_STATUSES = ["Draft", "Submitted"];
+
 export function FuelManagementPage() {
   return (
     <>
@@ -66,6 +70,7 @@ function TransactionsTab() {
   const [term, setTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("All");
   const [paymentFilter, setPaymentFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   const { data, isLoading } = useQuery({
     queryKey: ["fuel-transactions-page"],
@@ -134,17 +139,20 @@ function TransactionsTab() {
     let totalCostTzs = 0;
     let dealerLitres = 0;
     let elsewhereLitres = 0;
+    let pendingLitres = 0;
     for (const r of rows) {
       const litres = Number(r["litres"] ?? 0);
       const cost = Number(r["total_cost"] ?? 0);
       const currency = String(r["currency"] ?? "TZS");
       const payment = String(r["payment_method"] ?? "");
+      const status = String(r["status"] ?? "Draft");
       totalLitres += litres;
       totalCostTzs += dualDisplay(cost, currency, fx).tzsValue;
       if (payment === DEALER_PAYMENT) dealerLitres += litres;
       else elsewhereLitres += litres;
+      if (status === "Submitted") pendingLitres += litres;
     }
-    return { totalLitres, totalCostTzs, dealerLitres, elsewhereLitres };
+    return { totalLitres, totalCostTzs, dealerLitres, elsewhereLitres, pendingLitres };
   }, [rows, fx]);
 
   const visible = useMemo(() => {
@@ -152,6 +160,12 @@ function TransactionsTab() {
     return rows.filter((r) => {
       if (supplierFilter !== "All" && String(r["supplier"] ?? "") !== supplierFilter) return false;
       if (paymentFilter !== "All" && String(r["payment_method"] ?? "") !== paymentFilter) return false;
+      if (statusFilter !== "All") {
+        const s = String(r["status"] ?? "Draft");
+        if (statusFilter === "Pending finance" && s !== "Submitted") return false;
+        if (statusFilter === "Draft" && s !== "Draft") return false;
+        if (statusFilter === "Processed" && !["Approved", "Paid", "Rejected"].includes(s)) return false;
+      }
       if (!t) return true;
       const trip = tripById.get(String(r["trip_id"]));
       const vehicle = vehicleById.get(String(r["vehicle_id"])) ?? "";
@@ -163,6 +177,7 @@ function TransactionsTab() {
         r["supplier"],
         r["receipt_number"],
         r["notes"],
+        r["status"],
         trip?.trip_number,
         vehicle,
         driver,
@@ -171,7 +186,7 @@ function TransactionsTab() {
         .join(" ");
       return haystack.includes(t);
     });
-  }, [rows, term, supplierFilter, paymentFilter, tripById, vehicleById, driverById]);
+  }, [rows, term, supplierFilter, paymentFilter, statusFilter, tripById, vehicleById, driverById]);
 
   function handleNew() {
     editor.openNew({
@@ -179,6 +194,7 @@ function TransactionsTab() {
       fuel_type: "Diesel",
       currency: "TZS",
       payment_method: DEALER_PAYMENT,
+      status: "Draft",
     });
   }
 
@@ -197,22 +213,22 @@ function TransactionsTab() {
           secondary={usd(stats.totalCostTzs / (fx > 0 ? fx : 2600))}
         />
         <StatTile
+          label="Awaiting finance"
+          primary={`${stats.pendingLitres.toLocaleString()} L`}
+          secondary="Submitted for approval"
+          tone="amber"
+        />
+        <StatTile
           label="Our dealer"
           primary={`${stats.dealerLitres.toLocaleString()} L`}
           secondary="Dealer / account"
           tone="primary"
         />
-        <StatTile
-          label="Purchased elsewhere"
-          primary={`${stats.elsewhereLitres.toLocaleString()} L`}
-          secondary="Cash, driver paid, etc."
-          tone="amber"
-        />
       </div>
 
       {/* Filters */}
       <Card className="mt-5 p-3 sm:p-4">
-        <div className="mb-3 grid gap-3 lg:grid-cols-[1fr_200px_200px]">
+        <div className="mb-3 grid gap-3 lg:grid-cols-[1fr_180px_180px_180px]">
           <Input
             value={term}
             onChange={(e) => setTerm(e.target.value)}
@@ -241,9 +257,23 @@ function TransactionsTab() {
               </option>
             ))}
           </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="All">All statuses</option>
+            <option value="Draft">Draft</option>
+            <option value="Pending finance">Pending finance</option>
+            <option value="Processed">Processed (Approved / Paid / Rejected)</option>
+          </select>
         </div>
 
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Submitted entries flow into <strong>Expenses</strong> for finance to verify.
+            Once approved, rejected or paid, this row locks and shows the decision.
+          </p>
           <Button onClick={handleNew}>
             <Plus className="size-4" /> New fuel entry
           </Button>
@@ -262,6 +292,7 @@ function TransactionsTab() {
                 <TableHead className="text-right">Litres</TableHead>
                 <TableHead className="text-right">Price/L</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Payment</TableHead>
                 <TableHead>Receipt</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -270,11 +301,11 @@ function TransactionsTab() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={12}>Loading…</TableCell>
+                  <TableCell colSpan={13}>Loading…</TableCell>
                 </TableRow>
               ) : visible.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12}>No fuel transactions yet.</TableCell>
+                  <TableCell colSpan={13}>No fuel transactions yet.</TableCell>
                 </TableRow>
               ) : (
                 visible.map((r) => {
@@ -292,6 +323,10 @@ function TransactionsTab() {
                     fx,
                   );
                   const isDealer = String(r["payment_method"] ?? "") === DEALER_PAYMENT;
+                  const status = String(r["status"] ?? "Draft");
+                  const isEditable = EDITABLE_FUEL_STATUSES.includes(status);
+                  const isSubmitted = status === "Submitted";
+
                   return (
                     <TableRow key={String(r["id"])} className="align-top">
                       <TableCell className="whitespace-nowrap">
@@ -334,6 +369,22 @@ function TransactionsTab() {
                         </div>
                       </TableCell>
                       <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <StatusBadge value={status} />
+                          {isSubmitted ? (
+                            <span className="text-[10px] text-muted-foreground">
+                              Pending finance
+                            </span>
+                          ) : status === "Paid" ? (
+                            <span className="text-[10px] text-muted-foreground">Paid by finance</span>
+                          ) : status === "Approved" ? (
+                            <span className="text-[10px] text-muted-foreground">Approved by finance</span>
+                          ) : status === "Rejected" ? (
+                            <span className="text-[10px] text-muted-foreground">Rejected by finance</span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <span
                           className={`rounded-full border px-2 py-0.5 text-xs ${
                             isDealer
@@ -366,6 +417,12 @@ function TransactionsTab() {
                             size="sm"
                             variant="ghost"
                             onClick={() => editor.openEdit(r)}
+                            disabled={!isEditable}
+                            title={
+                              isEditable
+                                ? "Edit"
+                                : "Locked — already processed by finance"
+                            }
                             aria-label="Edit"
                           >
                             <Pencil className="size-4" />
@@ -384,6 +441,12 @@ function TransactionsTab() {
                                 remove.mutate(String(r["id"]));
                               }
                             }}
+                            disabled={!isEditable}
+                            title={
+                              isEditable
+                                ? "Delete"
+                                : "Locked — already processed by finance"
+                            }
                             aria-label="Delete"
                           >
                             <Trash2 className="size-4" />
@@ -462,7 +525,7 @@ function AllocationsTab() {
         <p className="text-sm text-muted-foreground">
           Office-side budget lines. For actual purchases, use the Transactions tab.
         </p>
-        <Button onClick={editor.openNew}>
+        <Button onClick={() => editor.openNew()}>
           <Plus className="size-4" /> New allocation
         </Button>
       </div>
