@@ -257,7 +257,9 @@ export const modules = {
     subtitle: "Every fuel purchase with receipt and payment method",
     prefix: "FT",
     prefixKey: "reference",
-    columns: ["transaction_date", "trip_id", "vehicle_id", "driver_id", "location", "supplier", "litres", "total_cost", "payment_method"],
+    columns: ["transaction_date", "trip_id", "vehicle_id", "driver_id", "location", "supplier", "litres", "total_cost", "payment_method", "status"],
+    statusKey: "status",
+    statusOptions: ["Draft", "Submitted"],
     searchKeys: ["reference", "location", "supplier", "receipt_number", "notes"],
     fields: [
       { key: "reference", readOnly: true },
@@ -301,6 +303,11 @@ export const modules = {
       },
       { key: "receipt_number" },
       { key: "receipt_url", label: "Receipt link" },
+      {
+        key: "status",
+        type: "select",
+        options: ["Draft", "Submitted"],
+      },
       { key: "notes", type: "textarea" },
     ],
   },
