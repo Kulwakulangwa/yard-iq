@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck } from "lucide-react";
+import { Fuel, MapPin, Truck } from "lucide-react";
 
 import { db } from "@/lib/db";
+import { tzs } from "@/lib/money";
 import { TableCell, TableRow } from "@/components/ui/table";
 
 type Row = Record<string, unknown>;
@@ -18,6 +19,8 @@ export type ConvoyLeg = {
   reportedAt: string;
   reportedBy: string;
   checkpoint: string;
+  fuelLitres: number;
+  fuelCost: number;
 };
 
 export function ago(iso: string) {
@@ -55,9 +58,7 @@ export function useConvoyLegs() {
       const vName = new Map(((vehicles ?? []) as Row[]).map((v) => [String(v["id"]), String(v["registration_number"] ?? "")]));
       const dName = new Map(((drivers ?? []) as Row[]).map((d) => [String(d["id"]), String(d["full_name"] ?? "")]));
 
-      // Latest per-leg location
       const latestByLeg = new Map<string, Row>();
-      // Latest trip-wide (no leg) location
       const latestTripOnly = new Map<string, Row>();
       for (const loc of (locations ?? []) as Row[]) {
         const legId = loc["trip_vehicle_id"] ? String(loc["trip_vehicle_id"]) : "";
@@ -80,7 +81,6 @@ export function useConvoyLegs() {
         const tripWide = latestTripOnly.get(tripId);
         for (const leg of tripLegs) {
           const id = String(leg["id"]);
-          // Use whichever is more recent — per-truck or whole-trip
           const loc = pickNewer(latestByLeg.get(id), tripWide) ?? {};
           const entry: ConvoyLeg = {
             id,
@@ -94,6 +94,8 @@ export function useConvoyLegs() {
             reportedAt: String(loc["reported_at"] ?? ""),
             reportedBy: String(loc["reported_by"] ?? ""),
             checkpoint: String(loc["checkpoint"] ?? ""),
+            fuelLitres: Number(leg["fuel_budget_litres"] ?? 0),
+            fuelCost: Number(leg["fuel_budget_cost"] ?? 0),
           };
           byTrip.set(tripId, [...(byTrip.get(tripId) ?? []), entry]);
         }
@@ -166,7 +168,7 @@ export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
             <span className="ml-auto text-xs text-muted-foreground">Truck {i + 1}</span>
           </div>
 
-          <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <div className="min-w-0">
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">Driver</dt>
               <dd className="mt-0.5 truncate font-medium">{leg.driver || "—"}</dd>
@@ -174,6 +176,23 @@ export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
             <div className="min-w-0">
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">Trailer</dt>
               <dd className="mt-0.5 truncate font-medium">{leg.trailer || "—"}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+                <Fuel className="size-3" /> Fuel budget
+              </dt>
+              <dd className="mt-0.5">
+                {leg.fuelLitres > 0 ? (
+                  <div>
+                    <div className="font-medium">{leg.fuelLitres.toLocaleString()} L</div>
+                    {leg.fuelCost > 0 ? (
+                      <div className="text-xs text-muted-foreground">{tzs(leg.fuelCost)}</div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Not set</span>
+                )}
+              </dd>
             </div>
             <div className="min-w-0">
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">Latest location</dt>
@@ -186,7 +205,7 @@ export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
               </dd>
             </div>
             {leg.reportedAt ? (
-              <div className="min-w-0">
+              <div className="min-w-0 sm:col-span-2">
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">Reported</dt>
                 <dd className="mt-0.5 text-muted-foreground">
                   {ago(leg.reportedAt)}
@@ -195,7 +214,7 @@ export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
               </div>
             ) : null}
             {leg.notes ? (
-              <div className="min-w-0 sm:col-span-2 lg:col-span-3">
+              <div className="min-w-0 sm:col-span-2 lg:col-span-4">
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">Note</dt>
                 <dd className="mt-0.5 text-muted-foreground">{leg.notes}</dd>
               </div>
