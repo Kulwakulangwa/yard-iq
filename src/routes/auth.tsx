@@ -4,12 +4,6 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-// Full-screen truck image used as the auth background.
-// Swap this URL for a branded photo if you prefer — any public image URL works.
 const BACKGROUND_IMAGE =
   "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=2400&q=80";
 
@@ -66,8 +60,8 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 p-4 md:p-6 lg:p-8">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl bg-background shadow-2xl md:min-h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-4rem)]">
+    <div className="min-h-screen w-full bg-slate-200 p-4 md:p-6 lg:p-8">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl bg-slate-100 shadow-2xl md:min-h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-4rem)]">
 
         {/* ─── Left panel: image ─────────────────────────────── */}
         <div className="relative hidden flex-1 md:block">
@@ -76,13 +70,11 @@ function AuthPage() {
             alt="Orbis fleet"
             className="absolute inset-0 h-full w-full object-cover"
           />
-          {/* Dark gradient so brand text stays readable */}
           <div className="absolute inset-0 bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-950/80" />
 
-          {/* Brand overlay */}
           <div className="relative z-10 flex h-full flex-col justify-between p-8 text-white">
             <div className="flex items-center gap-2">
-              <div className="grid size-10 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+              <div className="grid size-10 place-items-center rounded-lg bg-white text-sm font-bold text-slate-900">
                 OR
               </div>
               <div>
@@ -107,87 +99,86 @@ function AuthPage() {
           </div>
         </div>
 
-        {/* ─── Right panel: form ─────────────────────────────── */}
-        <div className="flex flex-1 flex-col justify-center p-6 sm:p-10 lg:p-12">
-          {/* Mobile-only brand header */}
-          <div className="mb-8 flex items-center gap-2 md:hidden">
-            <div className="grid size-8 place-items-center rounded bg-primary text-xs font-bold text-primary-foreground">
-              OR
+        {/* ─── Right panel: modern black glass card on grey ──── */}
+        <div className="relative flex flex-1 items-center justify-center bg-slate-100 p-6 sm:p-10 lg:p-12">
+          <div className="w-full max-w-sm rounded-3xl bg-gradient-to-br from-slate-900 via-slate-950 to-black p-8 shadow-2xl ring-1 ring-white/5">
+            {/* Mobile-only brand */}
+            <div className="mb-6 flex items-center gap-2 md:hidden">
+              <div className="grid size-10 place-items-center rounded-full bg-white/10 text-sm font-bold text-white shadow-inner">
+                OR
+              </div>
+              <div>
+                <p className="text-sm font-semibold leading-tight text-white">Orbis Logistics</p>
+                <p className="text-[11px] text-white/50">Operations, yard control & security</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold leading-tight">Orbis Logistics</p>
-              <p className="text-xs text-muted-foreground">Operations, yard control & security</p>
-            </div>
-          </div>
 
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Sign in to continue to your operations dashboard.
+            {/* Desktop brand mark */}
+            <div className="mb-6 hidden justify-center md:flex">
+              <div className="grid size-12 place-items-center rounded-full bg-white/10 text-sm font-bold text-white shadow-lg ring-1 ring-white/10">
+                OR
+              </div>
+            </div>
+
+            <h2 className="text-center text-2xl font-semibold text-white">
+              Welcome back
+            </h2>
+            <p className="mt-2 text-center text-xs text-white/50">
+              Sign in to your operations dashboard
             </p>
-          </div>
 
-          <form onSubmit={submit} className="space-y-5">
-            <div>
-              <Label htmlFor="email" className="mb-1.5 block text-sm font-medium">
-                Work email
-              </Label>
-              <Input
-                id="email"
+            <form onSubmit={submit} className="mt-6 flex flex-col gap-3">
+              <input
                 type="email"
                 autoComplete="email"
                 autoCapitalize="none"
                 spellCheck={false}
+                placeholder="Email"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   setErrorMsg(null);
                 }}
-                placeholder="you@company.com"
-                className="h-11 rounded-xl"
                 required
+                className="w-full rounded-xl bg-white/10 px-5 py-3 text-sm text-white placeholder-white/40 shadow-inner outline-none ring-1 ring-white/5 transition focus:ring-2 focus:ring-white/30"
               />
-            </div>
-
-            <div>
-              <Label htmlFor="pw" className="mb-1.5 block text-sm font-medium">
-                Password
-              </Label>
-              <Input
-                id="pw"
+              <input
                 type="password"
                 autoComplete="current-password"
+                placeholder="Password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
                   setErrorMsg(null);
                 }}
-                placeholder="••••••••"
-                className="h-11 rounded-xl"
                 required
                 minLength={6}
+                className="w-full rounded-xl bg-white/10 px-5 py-3 text-sm text-white placeholder-white/40 shadow-inner outline-none ring-1 ring-white/5 transition focus:ring-2 focus:ring-white/30"
               />
-            </div>
 
-            {errorMsg ? (
-              <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {errorMsg}
-              </p>
-            ) : null}
+              {errorMsg ? (
+                <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                  {errorMsg}
+                </p>
+              ) : null}
 
-            <Button
-              type="submit"
-              className="h-11 w-full rounded-xl text-sm font-medium"
-              disabled={busy || !ready}
-            >
-              {busy ? "Please wait…" : "Sign in"}
-            </Button>
-          </form>
+              <hr className="my-1 border-white/10" />
 
-          <p className="mt-8 text-center text-xs text-muted-foreground">
-            Accounts are created by your administrator. Contact your manager if you
-            need access.
-          </p>
+              <button
+                type="submit"
+                disabled={busy || !ready}
+                className="w-full rounded-full bg-white/10 px-5 py-3 text-sm font-medium text-white shadow transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busy ? "Please wait…" : "Sign in"}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-[11px] leading-relaxed text-white/40">
+              Accounts are created by your administrator.
+              <br />
+              Contact your manager if you need access.
+            </p>
+          </div>
         </div>
       </div>
     </div>
