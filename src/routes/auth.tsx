@@ -60,92 +60,118 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-200 p-4 md:p-6 lg:p-8">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl bg-slate-100 shadow-2xl md:min-h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-4rem)]">
+    <div className="relative flex min-h-screen w-full items-center justify-center bg-[#0a0a0a] px-4 py-8">
+      {/* Ambient gradient glows for depth — no bright anything */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-1/3 left-1/4 h-[500px] w-[500px] rounded-full bg-orange-500/5 blur-[120px]" />
+        <div className="absolute -bottom-1/3 right-1/4 h-[500px] w-[500px] rounded-full bg-blue-500/5 blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 flex w-full max-w-5xl overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0f0f10] shadow-[0_8px_60px_-15px_rgba(0,0,0,0.8)]">
 
         {/* ─── Left panel: image ─────────────────────────────── */}
         <div className="relative hidden flex-1 md:block">
           <img
             src={BACKGROUND_IMAGE}
             alt="Orbis fleet"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover opacity-90"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-950/80" />
+          {/* Heavy dark overlay — keeps the image subtle, not bright */}
+          <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-[#0a0a0a]/85 to-black/95" />
 
-          <div className="relative z-10 flex h-full flex-col justify-between p-8 text-white">
-            <div className="flex items-center gap-2">
-              <div className="grid size-10 place-items-center rounded-lg bg-white text-sm font-bold text-slate-900">
+          <div className="relative z-10 flex h-full flex-col justify-between p-10 text-white">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-md border border-orange-500/30 bg-orange-500/10 text-sm font-bold text-orange-400">
                 OR
               </div>
               <div>
-                <p className="font-semibold leading-tight">Orbis Logistics</p>
-                <p className="text-xs text-white/70">Operations, yard control & security</p>
+                <p className="text-sm font-semibold leading-tight text-white">
+                  Orbis Logistics
+                </p>
+                <p className="text-[11px] text-white/40">
+                  Operations · Yard Control · Security
+                </p>
               </div>
             </div>
 
             <div className="max-w-sm">
-              <h2 className="text-3xl font-bold leading-tight">
-                Border freight, tracked end to end.
+              <div className="mb-6 h-px w-16 bg-orange-500/60" />
+              <h2 className="text-[28px] font-semibold leading-tight tracking-tight text-white">
+                Every truck, load and shilling — accounted for.
               </h2>
-              <p className="mt-3 text-sm text-white/80">
-                Sulphur out, copper back. Every truck, load and shilling accounted
-                for — from the yard to the customer's gate.
+              <p className="mt-4 text-sm leading-relaxed text-white/50">
+                Sulphur out, copper back. Cross-border freight with full
+                yard control, load verification, and driver accountability.
               </p>
             </div>
 
-            <p className="text-xs text-white/60">
-              © {new Date().getFullYear()} Orbis Logistics. All rights reserved.
+            <p className="text-[11px] text-white/30">
+              © {new Date().getFullYear()} Orbis Logistics
             </p>
           </div>
         </div>
 
-        {/* ─── Right panel: modern black glass card on grey ──── */}
-        <div className="relative flex flex-1 items-center justify-center bg-slate-100 p-6 sm:p-10 lg:p-12">
-          <div className="w-full max-w-sm rounded-3xl bg-gradient-to-br from-slate-900 via-slate-950 to-black p-8 shadow-2xl ring-1 ring-white/5">
-            {/* Mobile-only brand */}
-            <div className="mb-6 flex items-center gap-2 md:hidden">
-              <div className="grid size-10 place-items-center rounded-full bg-white/10 text-sm font-bold text-white shadow-inner">
-                OR
-              </div>
-              <div>
-                <p className="text-sm font-semibold leading-tight text-white">Orbis Logistics</p>
-                <p className="text-[11px] text-white/50">Operations, yard control & security</p>
-              </div>
+        {/* ─── Right panel: dark sign-in form ────────────────── */}
+        <div className="flex flex-1 flex-col justify-center bg-[#0f0f10] p-8 sm:p-12 lg:p-14">
+          {/* Mobile-only brand */}
+          <div className="mb-8 flex items-center gap-3 md:hidden">
+            <div className="grid size-10 place-items-center rounded-md border border-orange-500/30 bg-orange-500/10 text-sm font-bold text-orange-400">
+              OR
             </div>
-
-            {/* Desktop brand mark */}
-            <div className="mb-6 hidden justify-center md:flex">
-              <div className="grid size-12 place-items-center rounded-full bg-white/10 text-sm font-bold text-white shadow-lg ring-1 ring-white/10">
-                OR
-              </div>
+            <div>
+              <p className="text-sm font-semibold leading-tight text-white">
+                Orbis Logistics
+              </p>
+              <p className="text-[11px] text-white/40">Operations · Yard · Security</p>
             </div>
+          </div>
 
-            <h2 className="text-center text-2xl font-semibold text-white">
-              Welcome back
-            </h2>
-            <p className="mt-2 text-center text-xs text-white/50">
-              Sign in to your operations dashboard
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold tracking-tight text-white">
+              Sign in
+            </h1>
+            <p className="mt-2 text-sm text-white/40">
+              Access your operations dashboard
             </p>
+          </div>
 
-            <form onSubmit={submit} className="mt-6 flex flex-col gap-3">
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-white/40"
+              >
+                Email
+              </label>
               <input
+                id="email"
                 type="email"
                 autoComplete="email"
                 autoCapitalize="none"
                 spellCheck={false}
-                placeholder="Email"
+                placeholder="you@company.com"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   setErrorMsg(null);
                 }}
                 required
-                className="w-full rounded-xl bg-white/10 px-5 py-3 text-sm text-white placeholder-white/40 shadow-inner outline-none ring-1 ring-white/5 transition focus:ring-2 focus:ring-white/30"
+                className="w-full rounded-lg border border-white/[0.08] bg-[#161618] px-4 py-3 text-sm text-white placeholder-white/25 outline-none transition focus:border-orange-500/40 focus:bg-[#1a1a1c] focus:ring-2 focus:ring-orange-500/10"
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="pw"
+                className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-white/40"
+              >
+                Password
+              </label>
               <input
+                id="pw"
                 type="password"
                 autoComplete="current-password"
-                placeholder="Password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -153,27 +179,27 @@ function AuthPage() {
                 }}
                 required
                 minLength={6}
-                className="w-full rounded-xl bg-white/10 px-5 py-3 text-sm text-white placeholder-white/40 shadow-inner outline-none ring-1 ring-white/5 transition focus:ring-2 focus:ring-white/30"
+                className="w-full rounded-lg border border-white/[0.08] bg-[#161618] px-4 py-3 text-sm text-white placeholder-white/25 outline-none transition focus:border-orange-500/40 focus:bg-[#1a1a1c] focus:ring-2 focus:ring-orange-500/10"
               />
+            </div>
 
-              {errorMsg ? (
-                <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                  {errorMsg}
-                </p>
-              ) : null}
+            {errorMsg ? (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-xs text-red-400">
+                {errorMsg}
+              </div>
+            ) : null}
 
-              <hr className="my-1 border-white/10" />
+            <button
+              type="submit"
+              disabled={busy || !ready}
+              className="mt-2 w-full rounded-lg bg-orange-500 px-4 py-3 text-sm font-semibold text-black shadow-lg shadow-orange-500/20 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
 
-              <button
-                type="submit"
-                disabled={busy || !ready}
-                className="w-full rounded-full bg-white/10 px-5 py-3 text-sm font-medium text-white shadow transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {busy ? "Please wait…" : "Sign in"}
-              </button>
-            </form>
-
-            <p className="mt-6 text-center text-[11px] leading-relaxed text-white/40">
+          <div className="mt-8 border-t border-white/[0.06] pt-6">
+            <p className="text-[11px] leading-relaxed text-white/30">
               Accounts are created by your administrator.
               <br />
               Contact your manager if you need access.
