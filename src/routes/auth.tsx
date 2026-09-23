@@ -9,6 +9,11 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// Full-screen truck image used as the auth background.
+// Swap this URL for a branded photo if you prefer — any public image URL works.
+const BACKGROUND_IMAGE =
+  "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=2400&q=80";
+
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
@@ -41,7 +46,6 @@ function AuthPage() {
     });
   }, [navigate]);
 
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -66,7 +70,6 @@ function AuthPage() {
         if (error) throw error;
         navigate({ to: "/dashboard", replace: true });
       }
-
     } catch (err) {
       const message = (err as Error).message;
       setErrorMsg(message);
@@ -77,8 +80,20 @@ function AuthPage() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-muted/40 px-4">
-      <Card className="w-full max-w-sm p-6">
+    <div
+      className="relative grid min-h-screen place-items-center overflow-hidden bg-slate-900 px-4"
+      style={{
+        backgroundImage: `url(${BACKGROUND_IMAGE})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
+      }}
+    >
+      {/* Dark overlay so the card stays readable on any photo */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/85 via-slate-900/75 to-slate-950/90" />
+
+      {/* Content sits above the overlay */}
+      <Card className="relative z-10 w-full max-w-sm border-white/10 bg-background/95 p-6 shadow-2xl backdrop-blur-sm">
         <div className="mb-5 flex items-center gap-2">
           <div className="grid size-8 place-items-center rounded bg-primary text-xs font-bold text-primary-foreground">
             OR
@@ -142,21 +157,7 @@ function AuthPage() {
           <Button type="submit" className="w-full" disabled={busy || !ready}>
             {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </Button>
-
         </form>
-
-        <Button
-          variant="outline"
-          className="mt-3 w-full"
-          onClick={() =>
-            supabase.auth.signInWithOAuth({
-              provider: "google",
-              options: { redirectTo: window.location.origin },
-            })
-          }
-        >
-          Continue with Google
-        </Button>
 
         <button
           className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
