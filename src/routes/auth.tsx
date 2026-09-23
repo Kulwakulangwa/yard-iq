@@ -61,7 +61,7 @@ function AuthPage() {
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center bg-[#0a0a0a] px-4 py-8">
-      {/* Ambient gradient glows for depth — no bright anything */}
+      {/* Ambient gradient glows — subtle depth */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-1/3 left-1/4 h-[500px] w-[500px] rounded-full bg-orange-500/5 blur-[120px]" />
         <div className="absolute -bottom-1/3 right-1/4 h-[500px] w-[500px] rounded-full bg-blue-500/5 blur-[120px]" />
@@ -69,43 +69,33 @@ function AuthPage() {
 
       <div className="relative z-10 flex w-full max-w-5xl overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0f0f10] shadow-[0_8px_60px_-15px_rgba(0,0,0,0.8)]">
 
-        {/* ─── Left panel: image ─────────────────────────────── */}
+        {/* ─── Left panel: image shines ──────────────────────── */}
         <div className="relative hidden flex-1 md:block">
           <img
             src={BACKGROUND_IMAGE}
             alt="Orbis fleet"
-            className="absolute inset-0 h-full w-full object-cover opacity-90"
+            className="absolute inset-0 h-full w-full object-cover"
           />
-          {/* Heavy dark overlay — keeps the image subtle, not bright */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-[#0a0a0a]/85 to-black/95" />
+          {/* Very light overlay — just enough for the brand mark to read */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
 
-          <div className="relative z-10 flex h-full flex-col justify-between p-10 text-white">
+          {/* Brand mark stays for identity */}
+          <div className="relative z-10 flex h-full flex-col justify-between p-8 text-white">
             <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-md border border-orange-500/30 bg-orange-500/10 text-sm font-bold text-orange-400">
+              <div className="grid size-10 place-items-center rounded-md border border-orange-500/30 bg-black/40 text-sm font-bold text-orange-400 backdrop-blur-sm">
                 OR
               </div>
               <div>
-                <p className="text-sm font-semibold leading-tight text-white">
+                <p className="text-sm font-semibold leading-tight text-white drop-shadow-md">
                   Orbis Logistics
                 </p>
-                <p className="text-[11px] text-white/40">
-                  Operations · Yard Control · Security
+                <p className="text-[11px] text-white/60 drop-shadow-md">
+                  Operations · Yard · Security
                 </p>
               </div>
             </div>
 
-            <div className="max-w-sm">
-              <div className="mb-6 h-px w-16 bg-orange-500/60" />
-              <h2 className="text-[28px] font-semibold leading-tight tracking-tight text-white">
-                Every truck, load and shilling — accounted for.
-              </h2>
-              <p className="mt-4 text-sm leading-relaxed text-white/50">
-                Sulphur out, copper back. Cross-border freight with full
-                yard control, load verification, and driver accountability.
-              </p>
-            </div>
-
-            <p className="text-[11px] text-white/30">
+            <p className="text-[11px] text-white/50 drop-shadow-md">
               © {new Date().getFullYear()} Orbis Logistics
             </p>
           </div>
