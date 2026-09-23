@@ -368,7 +368,7 @@ function TransactionsTab() {
                           {display.secondary}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <div className="flex flex-col gap-0.5">
                           <StatusBadge value={status} />
                           {isSubmitted ? (
@@ -384,9 +384,9 @@ function TransactionsTab() {
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-xs ${
+                          className={`inline-block rounded-full border px-2 py-0.5 text-xs ${
                             isDealer
                               ? "border-primary/40 bg-primary/5 text-primary"
                               : "border-warning/40 bg-warning/5"
@@ -395,7 +395,7 @@ function TransactionsTab() {
                           {String(r["payment_method"] ?? "—")}
                         </span>
                       </TableCell>
-                      <TableCell className="text-xs">
+                      <TableCell className="whitespace-nowrap text-xs">
                         {r["receipt_url"] ? (
                           <a
                             href={String(r["receipt_url"])}
