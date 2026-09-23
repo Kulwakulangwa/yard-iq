@@ -17,11 +17,12 @@ function Icon({ name, className }: { name: string; className?: string }) {
 }
 
 function useTheme() {
-  const [dark, setDark] = useState(false);
+  // Dark is the default. Light only if the user explicitly picked it.
+  const [dark, setDark] = useState(true);
 
   useEffect(() => {
     const saved = localStorage.getItem("orbis-theme");
-    const isDark = saved === "dark";
+    const isDark = saved !== "light";
     setDark(isDark);
     document.documentElement.classList.toggle("dark", isDark);
   }, []);
@@ -54,7 +55,12 @@ function initials(email: string) {
 
 function ProfileCard({ email, collapsed }: { email: string; collapsed?: boolean }) {
   return (
-    <div className={cn("m-3 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 p-3", collapsed && "m-2 p-2")}>
+    <div
+      className={cn(
+        "m-3 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 p-3",
+        collapsed && "m-2 p-2",
+      )}
+    >
       <div className="flex items-center gap-2.5">
         <div className="relative">
           <div className="grid size-9 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
@@ -76,7 +82,7 @@ function ProfileCard({ email, collapsed }: { email: string; collapsed?: boolean 
 function NavList({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
-    <nav className={cn("space-y-5 p-3", collapsed && "px-2")}>
+    <nav className={cn("space-y-5 p-3 pb-8", collapsed && "px-2")}>
       {nav.map((g) => (
         <div key={g.group}>
           {!collapsed ? (
@@ -100,7 +106,7 @@ function NavList({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed
                       collapsed && "justify-center px-0",
                       active
                         ? "bg-primary/10 font-medium text-primary"
-                        : "text-foreground/80 hover:bg-muted hover:text-foreground",
+                        : "text-foreground/70 hover:bg-muted hover:text-foreground",
                     )}
                   >
                     <Icon name={item.icon} className="size-4 shrink-0" />
@@ -125,8 +131,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { dark, toggle } = useTheme();
   const email = useEmail();
 
+  // Default sidebar collapsed on tablet (768–1023); expanded on desktop.
   useEffect(() => {
-    setCollapsed(localStorage.getItem("orbis-sidebar") === "collapsed");
+    const saved = localStorage.getItem("orbis-sidebar");
+    if (saved === "collapsed") {
+      setCollapsed(true);
+      return;
+    }
+    if (saved === "expanded") {
+      setCollapsed(false);
+      return;
+    }
+    setCollapsed(window.innerWidth < 1024);
   }, []);
 
   function toggleCollapsed() {
@@ -144,66 +160,88 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-background">
+      {/* ─── Fixed sidebar (tablet 768px and up) ─────────────── */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 hidden overflow-y-auto border-r bg-card lg:block print:hidden",
+          "fixed inset-y-0 left-0 z-30 hidden overflow-y-auto border-r border-sidebar-border bg-sidebar print:hidden md:block",
           collapsed ? "w-16" : "w-64",
         )}
       >
-        <div className={cn("flex h-14 items-center gap-2 border-b px-4", collapsed && "justify-center px-0")}>
+        <div
+          className={cn(
+            "sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-sidebar-border bg-sidebar px-4",
+            collapsed && "justify-center px-0",
+          )}
+        >
           <div className="grid size-7 shrink-0 place-items-center rounded bg-primary text-xs font-bold text-primary-foreground">
             OR
           </div>
-          {!collapsed ? <span className="font-semibold tracking-tight">Orbis Logistics</span> : null}
+          {!collapsed ? (
+            <span className="font-semibold tracking-tight text-sidebar-foreground">
+              Orbis Logistics
+            </span>
+          ) : null}
         </div>
         <ProfileCard email={email} collapsed={collapsed} />
         <NavList collapsed={collapsed} />
       </aside>
 
-      <div className={collapsed ? "lg:pl-16" : "lg:pl-64"}>
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-card/95 px-3 backdrop-blur print:hidden">
+      {/* ─── Main content column ─────────────────────────────── */}
+      <div className={cn("transition-[padding] duration-200", collapsed ? "md:pl-16" : "md:pl-64")}>
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur print:hidden sm:px-4">
+          {/* Mobile drawer trigger (below 768px) */}
           <Sheet open={openNav} onOpenChange={setOpenNav}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu">
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 overflow-y-auto p-0">
-              <SheetTitle className="px-4 pt-4 text-base">Orbis Logistics</SheetTitle>
+            <SheetContent side="left" className="w-72 overflow-y-auto border-sidebar-border bg-sidebar p-0">
+              <SheetTitle className="px-4 pt-4 text-base text-sidebar-foreground">
+                Orbis Logistics
+              </SheetTitle>
               <ProfileCard email={email} />
               <NavList onNavigate={() => setOpenNav(false)} />
             </SheetContent>
           </Sheet>
 
+          {/* Collapse toggle (768px and up) */}
           <Button
             variant="ghost"
             size="icon"
-            className="hidden lg:inline-flex"
+            className="hidden md:inline-flex"
             onClick={toggleCollapsed}
             aria-label="Collapse sidebar"
           >
             {collapsed ? <PanelLeft className="size-5" /> : <PanelLeftClose className="size-5" />}
           </Button>
 
+          {/* Search — compact on mobile, wide from sm up */}
           <button
             onClick={() => setOpenSearch(true)}
-            className="flex flex-1 items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted sm:max-w-md"
+            className="flex flex-1 items-center gap-2 rounded-md border border-input bg-secondary/50 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary sm:max-w-md"
           >
-            <Search className="size-4" />
-            Search trips, loads, vehicles, drivers, tires…
+            <Search className="size-4 shrink-0" />
+            <span className="truncate">
+              <span className="hidden sm:inline">Search trips, loads, vehicles, drivers, tires…</span>
+              <span className="sm:hidden">Search…</span>
+            </span>
           </button>
 
-          <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
-            {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+              {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+            </Button>
 
-          <Button variant="ghost" size="sm" onClick={signOut}>
-            <LogOut className="mr-1.5 size-4" /> <span className="hidden sm:inline">Sign out</span>
-          </Button>
+            <Button variant="ghost" size="sm" onClick={signOut}>
+              <LogOut className="mr-1.5 size-4" />
+              <span className="hidden sm:inline">Sign out</span>
+            </Button>
+          </div>
         </header>
 
-        <main className="w-full p-3 sm:p-5 lg:p-6">{children}</main>
+        <main className="w-full p-3 sm:p-5 lg:p-6 xl:p-8">{children}</main>
       </div>
 
       <GlobalSearch open={openSearch} onOpenChange={setOpenSearch} />
@@ -223,7 +261,7 @@ export function PageHeader({
   return (
     <div className="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:flex-wrap sm:justify-between">
       <div className="min-w-0">
-        <h1 className="truncate text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap gap-2 print:hidden">{actions}</div> : null}
