@@ -17,7 +17,6 @@ function Icon({ name, className }: { name: string; className?: string }) {
 }
 
 function useTheme() {
-  // Dark is the default. Light only if the user explicitly picked it.
   const [dark, setDark] = useState(true);
 
   useEffect(() => {
@@ -66,12 +65,14 @@ function ProfileCard({ email, collapsed }: { email: string; collapsed?: boolean 
           <div className="grid size-9 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
             {initials(email)}
           </div>
-          <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-card bg-success" />
+          <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-sidebar bg-success" />
         </div>
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{email || "Signed in"}</p>
-            <p className="text-[11px] text-muted-foreground">Online</p>
+            <p className="truncate text-sm font-medium text-sidebar-foreground">
+              {email || "Signed in"}
+            </p>
+            <p className="text-[11px] text-sidebar-foreground/50">Online</p>
           </div>
         ) : null}
       </div>
@@ -86,11 +87,11 @@ function NavList({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed
       {nav.map((g) => (
         <div key={g.group}>
           {!collapsed ? (
-            <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
               {g.group}
             </p>
           ) : (
-            <div className="mx-2 mb-2 border-t" />
+            <div className="mx-2 mb-2 border-t border-sidebar-border" />
           )}
           <ul className="space-y-0.5">
             {g.items.map((item) => {
@@ -105,8 +106,8 @@ function NavList({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed
                       "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
                       collapsed && "justify-center px-0",
                       active
-                        ? "bg-primary/10 font-medium text-primary"
-                        : "text-foreground/70 hover:bg-muted hover:text-foreground",
+                        ? "bg-primary/15 font-medium text-primary"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                     )}
                   >
                     <Icon name={item.icon} className="size-4 shrink-0" />
@@ -131,7 +132,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { dark, toggle } = useTheme();
   const email = useEmail();
 
-  // Default sidebar collapsed on tablet (768–1023); expanded on desktop.
   useEffect(() => {
     const saved = localStorage.getItem("orbis-sidebar");
     if (saved === "collapsed") {
@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ─── Fixed sidebar (tablet 768px and up) ─────────────── */}
+      {/* ─── Fixed sidebar ───────────────────────────────────── */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-30 hidden overflow-y-auto border-r border-sidebar-border bg-sidebar print:hidden md:block",
@@ -187,10 +187,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <NavList collapsed={collapsed} />
       </aside>
 
-      {/* ─── Main content column ─────────────────────────────── */}
+      {/* ─── Main content ────────────────────────────────────── */}
       <div className={cn("transition-[padding] duration-200", collapsed ? "md:pl-16" : "md:pl-64")}>
         <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur print:hidden sm:px-4">
-          {/* Mobile drawer trigger (below 768px) */}
           <Sheet open={openNav} onOpenChange={setOpenNav}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
@@ -206,7 +205,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </SheetContent>
           </Sheet>
 
-          {/* Collapse toggle (768px and up) */}
           <Button
             variant="ghost"
             size="icon"
@@ -217,7 +215,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             {collapsed ? <PanelLeft className="size-5" /> : <PanelLeftClose className="size-5" />}
           </Button>
 
-          {/* Search — compact on mobile, wide from sm up */}
           <button
             onClick={() => setOpenSearch(true)}
             className="flex flex-1 items-center gap-2 rounded-md border border-input bg-secondary/50 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary sm:max-w-md"
