@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/orbis/AppShell";
 import { StatusBadge } from "@/components/orbis/StatusBadge";
+import { cn } from "@/lib/utils";
 import { tzs, usd, sum } from "@/lib/money";
 import { useFxRate } from "@/lib/fx";
 
@@ -78,6 +79,32 @@ function useOffice() {
   });
 }
 
+// ───────────────────────────────────────────────────────────────
+// Stat — colourful card with a coloured left border and matching
+// value text. Each `tone` maps to a semantic role.
+// ───────────────────────────────────────────────────────────────
+type StatTone = "default" | "blue" | "green" | "amber" | "red" | "violet" | "orange";
+
+const TONE_BORDER: Record<StatTone, string> = {
+  default: "border-l-muted-foreground/30",
+  blue: "border-l-blue-500",
+  green: "border-l-emerald-500",
+  amber: "border-l-amber-500",
+  red: "border-l-red-500",
+  violet: "border-l-violet-500",
+  orange: "border-l-orange-500",
+};
+
+const TONE_TEXT: Record<StatTone, string> = {
+  default: "text-foreground",
+  blue: "text-blue-400",
+  green: "text-emerald-400",
+  amber: "text-amber-400",
+  red: "text-red-400",
+  violet: "text-violet-400",
+  orange: "text-orange-400",
+};
+
 export function Stat({
   label,
   value,
@@ -87,17 +114,12 @@ export function Stat({
   label: string;
   value: string | number;
   hint?: string;
-  tone?: "default" | "amber" | "red";
+  tone?: StatTone;
 }) {
   return (
-    <Card className="p-4">
+    <Card className={cn("border-l-4 p-4", TONE_BORDER[tone])}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p
-        className={
-          "mt-1 text-xl font-semibold sm:text-2xl " +
-          (tone === "red" ? "text-destructive" : tone === "amber" ? "text-warning-foreground" : "text-foreground")
-        }
-      >
+      <p className={cn("mt-1 text-xl font-semibold sm:text-2xl", TONE_TEXT[tone])}>
         {value}
       </p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
@@ -192,17 +214,17 @@ function Dashboard() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat label="Contract revenue" value={tzs(revenueTzs)} hint={usd(revenueTzs / fx)} />
-            <Stat label="Cash disbursed" value={tzs(cashDisbursed)} hint={usd(cashDisbursed / fx)} />
-            <Stat label="Outstanding from customers" value={tzs(outstanding)} tone={outstanding > 0 ? "amber" : "default"} />
-            <Stat label="Fuel approved" value={`${litres.toLocaleString()} L`} hint={tzs(fuelCost)} />
-            <Stat label="Active trips" value={activeTrips} />
+            <Stat label="Contract revenue" value={tzs(revenueTzs)} hint={usd(revenueTzs / fx)} tone="green" />
+            <Stat label="Cash disbursed" value={tzs(cashDisbursed)} hint={usd(cashDisbursed / fx)} tone="orange" />
+            <Stat label="Outstanding from customers" value={tzs(outstanding)} tone="amber" />
+            <Stat label="Fuel approved" value={`${litres.toLocaleString()} L`} hint={tzs(fuelCost)} tone="violet" />
+            <Stat label="Active trips" value={activeTrips} tone="blue" />
             <Stat label="Awaiting dispatch" value={awaitingDispatch} tone="amber" />
-            <Stat label="Loads to verify" value={loadsToVerify} tone="amber" />
-            <Stat label="Vehicles available" value={available} />
-            <Stat label="In maintenance" value={inMaint} tone="amber" />
-            <Stat label="Open invoices" value={openInvoices} />
-            <Stat label="Today's expenses" value={tzs(todayExpense)} />
+            <Stat label="Loads to verify" value={loadsToVerify} tone="violet" />
+            <Stat label="Vehicles available" value={available} tone="green" />
+            <Stat label="In maintenance" value={inMaint} tone="red" />
+            <Stat label="Open invoices" value={openInvoices} tone="blue" />
+            <Stat label="Today's expenses" value={tzs(todayExpense)} tone="orange" />
             <Stat label="Exceptions to approve" value={openExceptions.length} tone="red" />
           </div>
 
