@@ -159,6 +159,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/auth" as never, replace: true });
   }
 
+  // Topbar uses the sidebar palette in BOTH themes.
+  // In light mode this yields the brand navy-blue bar; in dark mode
+  // it blends with the near-black sidebar. Same colors, always dark.
+  const topbarBg = "bg-sidebar border-sidebar-border text-sidebar-foreground";
+
   return (
     <div className="min-h-screen bg-background">
       {/* ─── Fixed sidebar ───────────────────────────────────── */}
@@ -189,10 +194,21 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* ─── Main content ────────────────────────────────────── */}
       <div className={cn("transition-[padding] duration-200", collapsed ? "md:pl-16" : "md:pl-64")}>
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur print:hidden sm:px-4">
+        {/* Topbar — navy blue in light mode, dark in dark mode */}
+        <header
+          className={cn(
+            "sticky top-0 z-20 flex h-14 items-center gap-2 border-b px-3 backdrop-blur print:hidden sm:px-4",
+            topbarBg,
+          )}
+        >
           <Sheet open={openNav} onOpenChange={setOpenNav}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-sidebar-foreground hover:bg-white/10 hover:text-white md:hidden"
+                aria-label="Open menu"
+              >
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
@@ -208,16 +224,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button
             variant="ghost"
             size="icon"
-            className="hidden md:inline-flex"
+            className="hidden text-sidebar-foreground hover:bg-white/10 hover:text-white md:inline-flex"
             onClick={toggleCollapsed}
             aria-label="Collapse sidebar"
           >
             {collapsed ? <PanelLeft className="size-5" /> : <PanelLeftClose className="size-5" />}
           </Button>
 
+          {/* Search pill — subtle glass on the navy bar */}
           <button
             onClick={() => setOpenSearch(true)}
-            className="flex flex-1 items-center gap-2 rounded-md border border-input bg-secondary/50 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary sm:max-w-md"
+            className="flex flex-1 items-center gap-2 rounded-md border border-sidebar-border bg-white/5 px-3 py-1.5 text-sm text-sidebar-foreground/60 transition-colors hover:bg-white/10 hover:text-sidebar-foreground sm:max-w-md"
           >
             <Search className="size-4 shrink-0" />
             <span className="truncate">
@@ -227,11 +244,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
 
           <div className="ml-auto flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-sidebar-foreground hover:bg-white/10 hover:text-white"
+              onClick={toggle}
+              aria-label="Toggle theme"
+            >
               {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
             </Button>
 
-            <Button variant="ghost" size="sm" onClick={signOut}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-sidebar-foreground hover:bg-white/10 hover:text-white"
+              onClick={signOut}
+            >
               <LogOut className="mr-1.5 size-4" />
               <span className="hidden sm:inline">Sign out</span>
             </Button>
