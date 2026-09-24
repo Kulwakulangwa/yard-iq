@@ -18,9 +18,9 @@ export const Route = createFileRoute("/_authenticated/drivers/")({
   head: () => ({
     meta: [
       { title: "Drivers — Orbis Logistics" },
-      { name: "description", content: "Driver register with trips completed, salary and passport expiry." },
+      { name: "description", content: "Driver register with trips completed, salary, licence and passport expiry." },
       { property: "og:title", content: "Drivers — Orbis Logistics" },
-      { property: "og:description", content: "Driver register with trips completed, salary and passport expiry." },
+      { property: "og:description", content: "Driver register with trips completed, salary, licence and passport expiry." },
     ],
   }),
   component: DriversPage,
@@ -44,8 +44,8 @@ function formatDate(value: unknown) {
   });
 }
 
-/** Passport expiry cell with tiered colour warnings. */
-function PassportExpiryCell({ value }: { value: unknown }) {
+/** Licence expiry cell — red when expired or ≤ 60 days remain. */
+function LicenceExpiryCell({ value }: { value: unknown }) {
   const days = daysUntil(value);
 
   if (days === null) {
@@ -66,7 +66,49 @@ function PassportExpiryCell({ value }: { value: unknown }) {
     );
   }
 
-  // Within 30 days — red
+  // 60 days or less — red (2 months warning)
+  if (days <= 60) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="whitespace-nowrap font-medium text-destructive">
+          {formatDate(value)}
+        </span>
+        <span className="inline-flex w-fit items-center rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+          {days}d left
+        </span>
+      </div>
+    );
+  }
+
+  // More than 60 days — neutral
+  return (
+    <span className="whitespace-nowrap text-muted-foreground">
+      {formatDate(value)}
+    </span>
+  );
+}
+
+/** Passport expiry cell — red when expired or ≤ 30 days remain, amber up to 90. */
+function PassportExpiryCell({ value }: { value: unknown }) {
+  const days = daysUntil(value);
+
+  if (days === null) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  if (days < 0) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="whitespace-nowrap font-medium text-destructive">
+          {formatDate(value)}
+        </span>
+        <span className="inline-flex w-fit items-center rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+          Expired {Math.abs(days)}d ago
+        </span>
+      </div>
+    );
+  }
+
   if (days <= 30) {
     return (
       <div className="flex flex-col gap-0.5">
@@ -80,7 +122,6 @@ function PassportExpiryCell({ value }: { value: unknown }) {
     );
   }
 
-  // 31–90 days — amber
   if (days <= 90) {
     return (
       <div className="flex flex-col gap-0.5">
@@ -94,7 +135,6 @@ function PassportExpiryCell({ value }: { value: unknown }) {
     );
   }
 
-  // More than 90 days — neutral
   return (
     <span className="whitespace-nowrap text-muted-foreground">
       {formatDate(value)}
@@ -135,7 +175,7 @@ function DriversPage() {
 
   return (
     <>
-      <PageHeader title="Drivers" subtitle="Driver register, trip load and passport status" />
+      <PageHeader title="Drivers" subtitle="Driver register, trip load and document status" />
       <div className="mb-4">
         <Button onClick={() => editor.openNew()}>New driver</Button>
       </div>
@@ -144,10 +184,11 @@ function DriversPage() {
         <Stat label="Total drivers" value={rows.length} />
         <Stat label="On trip" value={rows.filter((r: any) => r.status === "On Trip").length} />
         <Stat
-          label="Passports expiring"
+          label="Documents expiring"
           value={rows.filter((r: any) => {
-            const days = daysUntil(r.passport_expiry);
-            return days !== null && days <= 90;
+            const lic = daysUntil(r.licence_expiry);
+            const p = daysUntil(r.passport_expiry);
+            return (lic !== null && lic <= 60) || (p !== null && p <= 90);
           }).length}
           tone="amber"
         />
@@ -199,8 +240,8 @@ function DriversPage() {
                     </TableCell>
                     <TableCell>{d.driver_code ?? "—"}</TableCell>
                     <TableCell>{d.phone ?? "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatDate(d.licence_expiry)}
+                    <TableCell>
+                      <LicenceExpiryCell value={d.licence_expiry} />
                     </TableCell>
                     <TableCell>
                       <PassportExpiryCell value={d.passport_expiry} />
