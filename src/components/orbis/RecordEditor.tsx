@@ -28,6 +28,24 @@ export type Row = Record<string, unknown>;
 
 type RefOption = { id: string; label: string; [k: string]: unknown };
 
+/**
+ * Fields that are computed on the client from other form values.
+ * Keyed by table → field key → formula.
+ *
+ * The formula receives the current draft and returns the computed value.
+ * Computed fields should be marked `readOnly: true` in modules.ts.
+ * The database re-computes on save via a trigger, so the client value is
+ * only for display — the source of truth is always the server.
+ */
+const COMPUTED_FIELDS: Record<string, Record<string, (draft: Row) => unknown>> = {
+  contracts: {
+    // (rate_go + rate_return) × distance_km
+    contract_amount: (draft) =>
+      (Number(draft["rate_go"] ?? 0) + Number(draft["rate_return"] ?? 0)) *
+      Number(draft["distance_km"] ?? 0),
+  },
+};
+
 export function useRefOptions(fields: Field[]) {
   const tables = [...new Set(fields.filter((f) => f.refTable).map((f) => f.refTable as RefTable))];
 
@@ -178,6 +196,13 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
     return set;
   }
 
+  /** Return the value to display for a field — either computed or from draft. */
+  function displayValueFor(f: Field): unknown {
+    const computedFn = COMPUTED_FIELDS[config.table]?.[f.key];
+    if (computedFn) return computedFn(draft);
+    return draft[f.key];
+  }
+
   function setField(f: Field, value: unknown) {
     if (lockedFields.has(f.key)) return;
     const autoFill: Record<string, unknown> = {};
@@ -269,11 +294,12 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
         <div className="grid gap-4 sm:grid-cols-2">
           {config.fields.map((f) => {
             const label = f.label ?? humanize(f.key);
-            const value = draft[f.key];
+            const displayValue = displayValueFor(f);
             const id = `f-${f.key}`;
             const wide = f.type === "textarea";
             const showAll = showAllFields.has(f.key);
             const isLocked = lockedFields.has(f.key);
+            const isComputed = Boolean(COMPUTED_FIELDS[config.table]?.[f.key]);
 
             const baseOptions = (refs[f.refTable as RefTable] ?? []).filter((o) => {
               if (!f.refFilter) return true;
@@ -301,7 +327,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                 {f.type === "textarea" ? (
                   <Textarea
                     id={id}
-                    value={String(value ?? "")}
+                    value={String(displayValue ?? "")}
                     onChange={(e) => setField(f, e.target.value)}
                     readOnly={isLocked}
                     className={isLocked ? "cursor-not-allowed opacity-70" : undefined}
@@ -309,14 +335,14 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                 ) : f.type === "boolean" ? (
                   <Switch
                     id={id}
-                    checked={Boolean(value)}
+                    checked={Boolean(displayValue)}
                     onCheckedChange={(v) => setField(f, v)}
                     disabled={isLocked}
                   />
                 ) : f.type === "select" ? (
                   <select
                     id={id}
-                    value={String(value ?? "")}
+                    value={String(displayValue ?? "")}
                     onChange={(e) => setField(f, e.target.value)}
                     disabled={isLocked}
                     className={`h-9 w-full rounded-md border border-input bg-background px-3 text-sm ${
@@ -334,7 +360,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                   <>
                     <select
                       id={id}
-                      value={String(value ?? "")}
+                      value={String(displayValue ?? "")}
                       onChange={(e) => setField(f, e.target.value)}
                       disabled={isLocked}
                       className={`h-9 w-full rounded-md border border-input bg-background px-3 text-sm ${
@@ -343,7 +369,7 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                     >
                       <option value="">—</option>
                       {baseOptions.map((o) => {
-                        const isSelected = String(value ?? "") === o.id;
+                        const isSelected = String(displayValue ?? "") === o.id;
                         const busy = busyReason(f, o.id);
                         const unrelated = relevantSet ? !relevantSet.has(o.id) : false;
 
@@ -391,31 +417,44 @@ export function useRecordEditor(config: ModuleConfig, rows: Row[] = []) {
                     ) : null}
                   </>
                 ) : (
-                  <Input
-                    id={id}
-                    type={
-                      f.type === "number"
-                        ? "number"
-                        : f.type === "date"
-                          ? "date"
-                          : f.type === "datetime"
-                            ? "datetime-local"
-                            : "text"
-                    }
-                    value={String(value ?? "").slice(0, f.type === "datetime" ? 16 : undefined)}
-                    readOnly={f.readOnly === true || isLocked}
-                    onChange={(e) =>
-                      setField(
-                        f,
+                  <>
+                    <Input
+                      id={id}
+                      type={
                         f.type === "number"
-                          ? e.target.value === ""
-                            ? ""
-                            : Number(e.target.value)
-                          : e.target.value,
-                      )
-                    }
-                    className={isLocked ? "cursor-not-allowed opacity-70" : undefined}
-                  />
+                          ? "number"
+                          : f.type === "date"
+                            ? "date"
+                            : f.type === "datetime"
+                              ? "datetime-local"
+                              : "text"
+                      }
+                      value={String(displayValue ?? "").slice(0, f.type === "datetime" ? 16 : undefined)}
+                      readOnly={f.readOnly === true || isLocked}
+                      onChange={(e) =>
+                        setField(
+                          f,
+                          f.type === "number"
+                            ? e.target.value === ""
+                              ? ""
+                              : Number(e.target.value)
+                            : e.target.value,
+                        )
+                      }
+                      className={
+                        isComputed
+                          ? "cursor-default bg-muted/40 font-medium"
+                          : isLocked
+                            ? "cursor-not-allowed opacity-70"
+                            : undefined
+                      }
+                    />
+                    {isComputed ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Auto-computed from rate and distance
+                      </p>
+                    ) : null}
+                  </>
                 )}
               </div>
             );
