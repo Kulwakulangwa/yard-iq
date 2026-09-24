@@ -8,7 +8,6 @@ export type FieldType =
   | "ref"
   | "boolean";
 
-/** Names of the lookup maps exposed by useRelatedIndex(). */
 export type RefResolveKey =
   | "tripsByCustomer"
   | "tripsByVehicle"
@@ -28,19 +27,10 @@ export type Field = {
   options?: string[];
   refTable?: RefTable;
   readOnly?: boolean;
-  /** Hard filter on option properties — e.g. only is_trailer=false. */
   refFilter?: { key: string; value: unknown };
-  /**
-   * Contextual filter. When set, the field's options are restricted to
-   * whatever the pivot field (`by`) maps to via the lookup (`resolve`).
-   * Options outside that set render faded with a small hint.
-   * If the pivot is empty, no filtering happens.
-   */
   refRule?: {
     by: string;
     resolve: RefResolveKey;
-    /** Auto-fill this field with the first match when the pivot changes,
-     *  but only if the field is currently empty. */
     autoFill?: boolean;
   };
 };
@@ -161,12 +151,13 @@ export const modules = {
     subtitle: "Border journeys, contracts and settlement",
     prefix: "TRP",
     prefixKey: "trip_number",
-    columns: ["trip_number", "customer_id", "origin", "destination", "planned_departure", "vehicle_id", "driver_id", "current_location", "status"],
+    columns: ["trip_number", "customer_id", "contract_id", "origin", "destination", "planned_departure", "vehicle_id", "driver_id", "current_location", "status"],
     statusKey: "status",
     searchKeys: ["trip_number", "origin", "destination"],
     fields: [
       { key: "trip_number", readOnly: true },
       { key: "customer_id", label: "Customer", type: "ref", refTable: "customers" },
+      { key: "contract_id", label: "Contract", type: "ref", refTable: "contracts" },
       { key: "origin" },
       { key: "destination" },
       { key: "planned_departure", type: "datetime" },
@@ -602,15 +593,20 @@ export const modules = {
   contracts: {
     table: "contracts",
     title: "Contracts",
-    subtitle: "Border freight contracts priced in USD",
-    columns: ["route", "customer_id", "contract_currency", "contract_amount", "start_date", "end_date", "status"],
+    subtitle: "Border freight contracts priced per km",
+    columns: ["route", "customer_id", "rate_go", "rate_return", "distance_km", "contract_amount", "total_ton", "total_trucks", "status"],
     statusKey: "status",
     searchKeys: ["route", "status"],
     fields: [
       { key: "customer_id", label: "Customer", type: "ref", refTable: "customers" },
       { key: "route" },
       { key: "contract_currency", type: "select", options: ["USD", "TZS"] },
-      { key: "contract_amount", type: "number" },
+      { key: "rate_go", label: "Outbound rate per km", type: "number" },
+      { key: "rate_return", label: "Return rate per km", type: "number" },
+      { key: "distance_km", label: "Distance (km)", type: "number" },
+      { key: "contract_amount", label: "Contract amount (auto)", type: "number", readOnly: true },
+      { key: "total_ton", label: "Total tonnage", type: "number" },
+      { key: "total_trucks", label: "Trucks on contract", type: "number" },
       { key: "start_date", type: "date" },
       { key: "end_date", type: "date" },
       { key: "status", type: "select", options: ["Active", "Expired", "Terminated"] },
