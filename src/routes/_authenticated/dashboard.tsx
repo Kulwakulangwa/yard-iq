@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageHeader } from "@/components/orbis/AppShell";
 import { StatusBadge } from "@/components/orbis/StatusBadge";
 import { cn } from "@/lib/utils";
 import { tzs, usd, sum } from "@/lib/money";
@@ -231,20 +230,8 @@ function Dashboard() {
 
   return (
     <>
-      {/* ─── Sticky header + stat cards ─────────────────────────── */}
-      <div className="sticky top-14 z-10 -mx-3 -mt-3 border-b bg-background/95 px-3 pt-2 pb-2 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:pt-3 sm:pb-3 lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-4 lg:pb-4 xl:-mx-8 xl:-mt-8 xl:px-8 xl:pt-4 xl:pb-4">
-        {/* Compact header — no bottom margin, small subtitle */}
-        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
-              Office Dashboard
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Revenue, cash and live trip status across the border fleet
-            </p>
-          </div>
-        </div>
-
+      {/* ─── Sticky stat cards (no header) ─────────────────────── */}
+      <div className="sticky top-14 z-10 -mx-3 -mt-3 border-b bg-background/95 px-3 pt-3 pb-3 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:pt-4 sm:pb-4 lg:-mx-6 lg:-mt-6 lg:px-6 xl:-mx-8 xl:-mt-8 xl:px-8">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
