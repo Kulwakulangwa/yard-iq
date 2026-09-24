@@ -8,6 +8,7 @@ export type FieldType =
   | "ref"
   | "boolean";
 
+/** Names of the lookup maps exposed by useRelatedIndex(). */
 export type RefResolveKey =
   | "tripsByCustomer"
   | "tripsByVehicle"
@@ -18,7 +19,8 @@ export type RefResolveKey =
   | "driversByTrip"
   | "driversByVehicle"
   | "loadsByTrip"
-  | "tiresByVehicle";
+  | "tiresByVehicle"
+  | "contractsByCustomer";
 
 export type Field = {
   key: string;
@@ -27,12 +29,27 @@ export type Field = {
   options?: string[];
   refTable?: RefTable;
   readOnly?: boolean;
+  /** Hard filter on option properties — e.g. only is_trailer=false. */
   refFilter?: { key: string; value: unknown };
+  /**
+   * Contextual filter. When set, the field's options are restricted to
+   * whatever the pivot field (`by`) maps to via the lookup (`resolve`).
+   * Options outside that set render faded with a small hint.
+   * If the pivot is empty, no filtering happens.
+   */
   refRule?: {
     by: string;
     resolve: RefResolveKey;
+    /** Auto-fill this field with the first match when the pivot changes,
+     *  but only if the field is currently empty. */
     autoFill?: boolean;
   };
+  /**
+   * When a ref is picked, copy these columns from the referenced record
+   * into these form fields. Only fills targets that are currently empty.
+   * Format: { sourceColumnInRefTable: targetFieldKey }
+   */
+  copyFields?: Record<string, string>;
 };
 
 export type RefTable =
@@ -157,9 +174,20 @@ export const modules = {
     fields: [
       { key: "trip_number", readOnly: true },
       { key: "customer_id", label: "Customer", type: "ref", refTable: "customers" },
-      { key: "contract_id", label: "Contract", type: "ref", refTable: "contracts" },
-      { key: "origin" },
-      { key: "destination" },
+      {
+        key: "contract_id",
+        label: "Contract",
+        type: "ref",
+        refTable: "contracts",
+        refRule: { by: "customer_id", resolve: "contractsByCustomer", autoFill: true },
+        copyFields: {
+          origin: "origin",
+          destination: "destination",
+          distance_km: "planned_distance",
+        },
+      },
+      { key: "origin", label: "Origin (auto from contract)" },
+      { key: "destination", label: "Destination (auto from contract)" },
       { key: "planned_departure", type: "datetime" },
       { key: "planned_arrival", type: "datetime" },
       { key: "vehicle_id", label: "Vehicle", type: "ref", refTable: "vehicles", refFilter: { key: "is_trailer", value: false } },
@@ -170,7 +198,7 @@ export const modules = {
         type: "select",
         options: ["Draft", "Approved", "Ready for Yard", "In Yard", "Dispatched", "In Transit", "At Border", "Delivered", "Pending Settlement", "Completed", "Closed", "Cancelled"],
       },
-      { key: "planned_distance", type: "number" },
+      { key: "planned_distance", label: "Distance (km) (auto from contract)", type: "number" },
       { key: "notes", type: "textarea" },
     ],
   },
@@ -594,12 +622,14 @@ export const modules = {
     table: "contracts",
     title: "Contracts",
     subtitle: "Border freight contracts priced per km",
-    columns: ["route", "customer_id", "rate_go", "rate_return", "distance_km", "contract_amount", "total_ton", "total_trucks", "status"],
+    columns: ["route", "customer_id", "origin", "destination", "distance_km", "rate_go", "rate_return", "contract_amount", "total_ton", "total_trucks", "status"],
     statusKey: "status",
-    searchKeys: ["route", "status"],
+    searchKeys: ["route", "origin", "destination", "status"],
     fields: [
       { key: "customer_id", label: "Customer", type: "ref", refTable: "customers" },
-      { key: "route" },
+      { key: "route", label: "Route label" },
+      { key: "origin" },
+      { key: "destination" },
       { key: "contract_currency", type: "select", options: ["USD", "TZS"] },
       { key: "rate_go", label: "Outbound rate per km", type: "number" },
       { key: "rate_return", label: "Return rate per km", type: "number" },
