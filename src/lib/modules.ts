@@ -168,7 +168,7 @@ export const modules = {
     subtitle: "Border journeys, contracts and settlement",
     prefix: "TRP",
     prefixKey: "trip_number",
-    columns: ["trip_number", "customer_id", "contract_id", "origin", "destination", "planned_departure", "vehicle_id", "driver_id", "current_location", "status"],
+    columns: ["trip_number", "customer_id", "origin", "destination", "vehicle_id", "driver_id", "current_location", "status"],
     statusKey: "status",
     searchKeys: ["trip_number", "origin", "destination"],
     fields: [
