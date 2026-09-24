@@ -6,9 +6,9 @@ import { db } from "@/lib/db";
 type Row = Record<string, unknown>;
 
 /**
- * In-memory lookup maps built once from trips, trip_vehicles, loads, tires.
- * Used by the ref-rule engine to fade options that are irrelevant to
- * whatever pivot the user picked (usually a Trip).
+ * In-memory lookup maps built once from trips, trip_vehicles, loads, tires,
+ * vehicles and contracts. Used by the ref-rule engine to fade options that
+ * are irrelevant to whatever pivot the user picked.
  */
 export type RelatedIndex = {
   /** customer_id → set of trip_ids for that customer */
@@ -31,6 +31,8 @@ export type RelatedIndex = {
   loadsByTrip: Map<string, Set<string>>;
   /** vehicle_id → set of tire_ids currently installed */
   tiresByVehicle: Map<string, Set<string>>;
+  /** customer_id → set of contract_ids for that customer */
+  contractsByCustomer: Map<string, Set<string>>;
   isLoading: boolean;
 };
 
@@ -45,6 +47,7 @@ const EMPTY_INDEX: RelatedIndex = {
   driversByVehicle: new Map(),
   loadsByTrip: new Map(),
   tiresByVehicle: new Map(),
+  contractsByCustomer: new Map(),
   isLoading: false,
 };
 
@@ -61,12 +64,13 @@ export function useRelatedIndex(): RelatedIndex {
   const { data, isLoading } = useQuery({
     queryKey: ["related-index"],
     queryFn: async () => {
-      const [trips, tripVehicles, loads, tires, vehicles] = await Promise.all([
+      const [trips, tripVehicles, loads, tires, vehicles, contracts] = await Promise.all([
         db.from("trips").select("id, customer_id, vehicle_id, driver_id"),
         db.from("trip_vehicles").select("trip_id, vehicle_id, trailer_id, driver_id"),
         db.from("loads").select("id, trip_id"),
         db.from("tires").select("id, vehicle_id"),
         db.from("vehicles").select("id, is_trailer"),
+        db.from("contracts").select("id, customer_id"),
       ]);
       return {
         trips: (trips.data ?? []) as Row[],
@@ -74,6 +78,7 @@ export function useRelatedIndex(): RelatedIndex {
         loads: (loads.data ?? []) as Row[],
         tires: (tires.data ?? []) as Row[],
         vehicles: (vehicles.data ?? []) as Row[],
+        contracts: (contracts.data ?? []) as Row[],
       };
     },
   });
@@ -91,12 +96,20 @@ export function useRelatedIndex(): RelatedIndex {
     const driversByVehicle = new Map<string, Set<string>>();
     const loadsByTrip = new Map<string, Set<string>>();
     const tiresByVehicle = new Map<string, Set<string>>();
+    const contractsByCustomer = new Map<string, Set<string>>();
 
     const trailerIdSet = new Set(
       (data.vehicles ?? [])
         .filter((v) => Boolean(v.is_trailer))
         .map((v) => String(v.id)),
     );
+
+    // Contracts → customers
+    for (const c of data.contracts) {
+      if (c.customer_id) {
+        push(contractsByCustomer, String(c.customer_id), String(c.id));
+      }
+    }
 
     // Trips → customers, vehicles, drivers
     for (const t of data.trips) {
@@ -163,6 +176,7 @@ export function useRelatedIndex(): RelatedIndex {
       driversByVehicle,
       loadsByTrip,
       tiresByVehicle,
+      contractsByCustomer,
       isLoading: false,
     };
   }, [data, isLoading]);
