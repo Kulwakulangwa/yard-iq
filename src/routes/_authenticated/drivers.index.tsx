@@ -18,13 +18,89 @@ export const Route = createFileRoute("/_authenticated/drivers/")({
   head: () => ({
     meta: [
       { title: "Drivers — Orbis Logistics" },
-      { name: "description", content: "Driver register with trips completed, salary and payments made." },
+      { name: "description", content: "Driver register with trips completed, salary and passport expiry." },
       { property: "og:title", content: "Drivers — Orbis Logistics" },
-      { property: "og:description", content: "Driver register with trips completed, salary and payments made." },
+      { property: "og:description", content: "Driver register with trips completed, salary and passport expiry." },
     ],
   }),
   component: DriversPage,
 });
+
+function daysUntil(value: unknown): number | null {
+  if (!value) return null;
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.round((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function formatDate(value: unknown) {
+  if (!value) return "—";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** Passport expiry cell with tiered colour warnings. */
+function PassportExpiryCell({ value }: { value: unknown }) {
+  const days = daysUntil(value);
+
+  if (days === null) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  // Expired
+  if (days < 0) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="whitespace-nowrap font-medium text-destructive">
+          {formatDate(value)}
+        </span>
+        <span className="inline-flex w-fit items-center rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+          Expired {Math.abs(days)}d ago
+        </span>
+      </div>
+    );
+  }
+
+  // Within 30 days — red
+  if (days <= 30) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="whitespace-nowrap font-medium text-destructive">
+          {formatDate(value)}
+        </span>
+        <span className="inline-flex w-fit items-center rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+          {days}d left
+        </span>
+      </div>
+    );
+  }
+
+  // 31–90 days — amber
+  if (days <= 90) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="whitespace-nowrap font-medium text-warning-foreground">
+          {formatDate(value)}
+        </span>
+        <span className="inline-flex w-fit items-center rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning-foreground">
+          {days}d left
+        </span>
+      </div>
+    );
+  }
+
+  // More than 90 days — neutral
+  return (
+    <span className="whitespace-nowrap text-muted-foreground">
+      {formatDate(value)}
+    </span>
+  );
+}
 
 function DriversPage() {
   const [term, setTerm] = useState("");
@@ -52,20 +128,29 @@ function DriversPage() {
   const editor = useRecordEditor(modules.drivers, rows);
 
   const filtered = rows.filter((r: any) =>
-    `${r.full_name ?? ""} ${r.driver_code ?? ""} ${r.phone ?? ""}`.toLowerCase().includes(term.trim().toLowerCase()),
+    `${r.full_name ?? ""} ${r.driver_code ?? ""} ${r.phone ?? ""}`
+      .toLowerCase()
+      .includes(term.trim().toLowerCase()),
   );
 
   return (
     <>
-      <PageHeader title="Drivers" subtitle="Driver register, trip load and payments" />
+      <PageHeader title="Drivers" subtitle="Driver register, trip load and passport status" />
       <div className="mb-4">
-        <Button onClick={editor.openNew}>New driver</Button>
+        <Button onClick={() => editor.openNew()}>New driver</Button>
       </div>
       {editor.dialog}
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Total drivers" value={rows.length} />
         <Stat label="On trip" value={rows.filter((r: any) => r.status === "On Trip").length} />
-        <Stat label="Payments made" value={tzs(sum(rows, (r: any) => r.paid))} />
+        <Stat
+          label="Passports expiring"
+          value={rows.filter((r: any) => {
+            const days = daysUntil(r.passport_expiry);
+            return days !== null && days <= 90;
+          }).length}
+          tone="amber"
+        />
       </div>
 
       <Card className="mt-5 p-3 sm:p-4">
@@ -83,10 +168,10 @@ function DriversPage() {
                 <TableHead>Code</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Licence expiry</TableHead>
+                <TableHead>Passport expiry</TableHead>
                 <TableHead>Trips</TableHead>
                 <TableHead>Total KM</TableHead>
                 <TableHead>Salary</TableHead>
-                <TableHead>Paid to date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Edit</TableHead>
               </TableRow>
@@ -114,11 +199,15 @@ function DriversPage() {
                     </TableCell>
                     <TableCell>{d.driver_code ?? "—"}</TableCell>
                     <TableCell>{d.phone ?? "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap">{String(d.licence_expiry ?? "—").slice(0, 10)}</TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatDate(d.licence_expiry)}
+                    </TableCell>
+                    <TableCell>
+                      <PassportExpiryCell value={d.passport_expiry} />
+                    </TableCell>
                     <TableCell>{d.tripCount}</TableCell>
                     <TableCell>{d.km.toLocaleString()}</TableCell>
                     <TableCell className="whitespace-nowrap">{tzs(d.monthly_salary_tzs)}</TableCell>
-                    <TableCell className="whitespace-nowrap">{tzs(d.paid)}</TableCell>
                     <TableCell>
                       <StatusBadge value={d.status} />
                     </TableCell>
