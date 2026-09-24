@@ -105,36 +105,70 @@ export function useConvoyLegs() {
   });
 }
 
+/**
+ * Nested rows shown under each trip. Reads as an indented sub-line, not a
+ * mini-table. Column alignment is intentionally loose so it stays legible
+ * at any viewport width.
+ */
 export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: number }) {
   return (
     <>
       {legs.map((leg, i) => (
-        <TableRow key={leg.id} className="bg-muted/30 hover:bg-muted/40">
-          <TableCell colSpan={colSpan} className="py-2">
-            <div className="grid min-w-[660px] grid-cols-[minmax(150px,1.2fr)_minmax(120px,1fr)_minmax(140px,1fr)_minmax(220px,1.5fr)] items-center gap-4 pl-4">
-              <div className="flex min-w-0 items-center gap-2">
-                <Truck className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm font-medium">{leg.vehicle}</span>
-                <span className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                  {leg.role || (i === 0 ? "Lead" : "Convoy")}
+        <TableRow
+          key={leg.id}
+          className="border-0 bg-muted/20 hover:bg-muted/30"
+        >
+          <TableCell colSpan={colSpan} className="py-2 pl-0 pr-4">
+            {/* Left accent bar to signal nesting */}
+            <div className="flex items-start gap-3 pl-6">
+              <div
+                aria-hidden
+                className="mt-1 h-full w-px self-stretch bg-border"
+              />
+
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+                {/* Truck + role */}
+                <span className="inline-flex items-center gap-1.5">
+                  <Truck className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="font-medium text-foreground">{leg.vehicle}</span>
+                  <span className="rounded-full border border-border/60 bg-background px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {leg.role || (i === 0 ? "Lead" : "Convoy")}
+                  </span>
                 </span>
-              </div>
-              <div className="min-w-0 text-sm text-muted-foreground">
-                Trailer <span className="text-foreground">{leg.trailer}</span>
-              </div>
-              <div className="min-w-0 text-sm text-muted-foreground">
-                Driver <span className="text-foreground">{leg.driver}</span>
-              </div>
-              <div className="flex min-w-0 items-center gap-1.5 text-sm">
-                <MapPin className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">
-                  {leg.location || "No location reported"}
-                  {leg.checkpoint ? ` · ${leg.checkpoint}` : ""}
+
+                {/* Driver */}
+                <span className="text-muted-foreground">
+                  Driver <span className="font-medium text-foreground">{leg.driver}</span>
                 </span>
-                {leg.reportedAt ? (
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    ({ago(leg.reportedAt)}
-                    {leg.reportedBy ? ` · ${leg.reportedBy}` : ""})
+
+                {/* Trailer — only if set */}
+                {leg.trailer && leg.trailer !== "—" ? (
+                  <span className="text-muted-foreground">
+                    Trailer <span className="font-medium text-foreground">{leg.trailer}</span>
+                  </span>
+                ) : null}
+
+                {/* Location + when */}
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                  <MapPin className="size-3 shrink-0" />
+                  <span className="truncate">
+                    {leg.location || "No location"}
+                    {leg.checkpoint ? ` · ${leg.checkpoint}` : ""}
+                  </span>
+                  {leg.reportedAt ? (
+                    <span className="shrink-0 opacity-70">
+                      ({ago(leg.reportedAt)}
+                      {leg.reportedBy ? ` · ${leg.reportedBy}` : ""})
+                    </span>
+                  ) : null}
+                </span>
+
+                {/* Fuel — only if set */}
+                {leg.fuelLitres > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    <Fuel className="size-3 shrink-0" />
+                    {leg.fuelLitres.toLocaleString()} L
+                    {leg.fuelCost > 0 ? ` · ${tzs(leg.fuelCost)}` : ""}
                   </span>
                 ) : null}
               </div>
@@ -146,6 +180,9 @@ export function ConvoyLegRows({ legs, colSpan }: { legs: ConvoyLeg[]; colSpan: n
   );
 }
 
+/**
+ * Card-list version, used on the trip detail page.
+ */
 export function ConvoyLegList({ legs }: { legs: ConvoyLeg[] }) {
   if (legs.length === 0) {
     return (
