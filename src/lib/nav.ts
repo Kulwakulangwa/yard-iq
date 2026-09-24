@@ -15,7 +15,9 @@ export const nav: NavGroup[] = [
     items: [
       { label: "Dashboard", icon: "LayoutDashboard", to: "/dashboard" },
       { label: "Trips", icon: "Route", to: "/m/trips", module: "trips" },
-      { label: "Loads", icon: "Package", to: "/m/loads", module: "loads" },
+      // Loads intentionally hidden from the sidebar — cargo is created and
+      // managed from the trip detail page. The module and its routes stay
+      // intact so /m/loads still works if a bookmark or report links to it.
       { label: "Customers", icon: "Building2", to: "/m/customers", module: "customers" },
       { label: "Contracts", icon: "FileSignature", to: "/m/contracts", module: "contracts" },
       { label: "Vehicles", icon: "Truck", to: "/vehicles" },
