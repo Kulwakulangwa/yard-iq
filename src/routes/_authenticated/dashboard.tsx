@@ -87,8 +87,7 @@ function useOffice() {
 }
 
 // ───────────────────────────────────────────────────────────────
-// Stat — colourful card with a coloured left border and matching
-// value text. Each `tone` maps to a semantic role.
+// Stat — compact colour-coded card
 // ───────────────────────────────────────────────────────────────
 type StatTone = "default" | "blue" | "green" | "amber" | "red" | "violet" | "orange";
 
@@ -124,12 +123,16 @@ export function Stat({
   tone?: StatTone;
 }) {
   return (
-    <Card className={cn("border-l-4 p-4", TONE_BORDER[tone])}>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={cn("mt-1 text-xl font-semibold sm:text-2xl", TONE_TEXT[tone])}>
+    <Card className={cn("border-l-4 p-3", TONE_BORDER[tone])}>
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p className={cn("mt-0.5 text-lg font-semibold leading-tight sm:text-xl", TONE_TEXT[tone])}>
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{hint}</p>
+      ) : null}
     </Card>
   );
 }
@@ -205,7 +208,6 @@ function Dashboard() {
     d?.expenses.filter((e) => String(e.expense_date ?? "").slice(0, 10) === today).reduce((s, e) => s + Number(e.amount ?? 0), 0) ?? 0;
   const openExceptions = d?.exceptions.filter((e) => e.status === "Open") ?? [];
 
-  // ─── Document expiry counts (licence ≤ 60d, passport ≤ 90d, plus expired) ───
   const licenceExpiring = (d?.drivers ?? []).filter((dr) => {
     const days = daysUntil(dr.licence_expiry);
     return days !== null && days <= 60;
@@ -230,15 +232,26 @@ function Dashboard() {
   return (
     <>
       {/* ─── Sticky header + stat cards ─────────────────────────── */}
-      <div className="sticky top-14 z-10 -mx-3 -mt-3 border-b bg-background/95 px-3 pt-3 pb-3 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:pt-5 lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-6 xl:-mx-8 xl:-mt-8 xl:px-8 xl:pt-8">
-        <PageHeader title="Office Dashboard" subtitle="Revenue, cash and live trip status across the border fleet" />
+      <div className="sticky top-14 z-10 -mx-3 -mt-3 border-b bg-background/95 px-3 pt-2 pb-2 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:pt-3 sm:pb-3 lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-4 lg:pb-4 xl:-mx-8 xl:-mt-8 xl:px-8 xl:pt-4 xl:pb-4">
+        {/* Compact header — no bottom margin, small subtitle */}
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
+              Office Dashboard
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Revenue, cash and live trip status across the border fleet
+            </p>
+          </div>
+        </div>
+
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
             <Stat label="Contract revenue" value={tzs(revenueTzs)} hint={usd(revenueTzs / fx)} tone="green" />
             <Stat label="Cash disbursed" value={tzs(cashDisbursed)} hint={usd(cashDisbursed / fx)} tone="orange" />
-            <Stat label="Outstanding from customers" value={tzs(outstanding)} tone="amber" />
+            <Stat label="Outstanding" value={tzs(outstanding)} tone="amber" />
             <Stat label="Fuel approved" value={`${litres.toLocaleString()} L`} hint={tzs(fuelCost)} tone="violet" />
             <Stat label="Active trips" value={activeTrips} tone="blue" />
             <Stat label="Awaiting dispatch" value={awaitingDispatch} tone="amber" />
@@ -248,17 +261,17 @@ function Dashboard() {
             <Stat
               label="Documents expiring"
               value={documentsExpiring}
-              hint={`${licenceExpiring} licence${licenceExpiring === 1 ? "" : "s"} · ${passportExpiring} passport${passportExpiring === 1 ? "" : "s"}`}
+              hint={`${licenceExpiring} lic · ${passportExpiring} pass`}
               tone={documentsExpiring > 0 ? "red" : "green"}
             />
             <Stat label="Today's expenses" value={tzs(todayExpense)} tone="orange" />
-            <Stat label="Exceptions to approve" value={openExceptions.length} tone="red" />
+            <Stat label="Exceptions" value={openExceptions.length} tone="red" />
           </div>
         )}
       </div>
 
       {/* ─── Scrollable lower section ───────────────────────────── */}
-      <div className="mt-5">
+      <div className="mt-4">
         <Card className="p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold">Trips</h2>
@@ -361,7 +374,7 @@ function Dashboard() {
           </div>
         </Card>
 
-        <Card className="mt-5 p-4">
+        <Card className="mt-4 p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold">Exceptions requiring approval</h2>
             <Link to="/approvals" className="text-sm text-primary hover:underline">
