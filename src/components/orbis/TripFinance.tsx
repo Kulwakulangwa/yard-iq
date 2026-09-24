@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { db } from "@/lib/db";
@@ -23,16 +24,35 @@ type Finance = {
 export function TripFinance({ tripId }: { tripId: string }) {
   const defaultFx = useFxRate();
 
+  // Look up the trip's linked contract + the finance row in one shot.
   const { data, isLoading } = useQuery({
-    queryKey: ["trip-finance", tripId],
+    queryKey: ["trip-finance-full", tripId],
     queryFn: async () => {
-      const { data, error } = await db
-        .from("trip_financials")
-        .select("*")
-        .eq("trip_id", tripId)
-        .maybeSingle();
-      if (error) throw error;
-      return data as any;
+      const [tripResult, financeResult] = await Promise.all([
+        db
+          .from("trips")
+          .select("id, contract_id, customer_id")
+          .eq("id", tripId)
+          .maybeSingle(),
+        db.from("trip_financials").select("*").eq("trip_id", tripId).maybeSingle(),
+      ]);
+      if (tripResult.error) throw tripResult.error;
+      if (financeResult.error) throw financeResult.error;
+
+      const trip = tripResult.data as { id: string; contract_id: string | null; customer_id: string | null } | null;
+      let contract: any = null;
+
+      if (trip?.contract_id) {
+        const { data: c, error: cErr } = await db
+          .from("contracts")
+          .select("*")
+          .eq("id", trip.contract_id)
+          .maybeSingle();
+        if (cErr) throw cErr;
+        contract = c;
+      }
+
+      return { trip, contract, finance: financeResult.data };
     },
   });
 
@@ -40,33 +60,51 @@ export function TripFinance({ tripId }: { tripId: string }) {
     return <p className="text-sm text-muted-foreground">Loading trip finances…</p>;
   }
 
+  const contract: any = data?.contract ?? null;
+
+  // Contract is the source of truth for amount + currency.
+  // Fall back to whatever was previously saved on trip_financials.
   const initial: Finance = {
-    contract_amount: Number(data?.contract_amount ?? 0),
-    contract_currency: String(data?.contract_currency ?? "USD"),
-    fx_exchange_rate: Number(data?.fx_exchange_rate ?? defaultFx),
-    advance_input_type: data?.advance_input_type ?? "percentage",
-    advance_value: Number(data?.advance_value ?? 0),
-    advance_paid_usd: Number(data?.advance_paid_usd ?? 0),
-    advance_paid_tzs: Number(data?.advance_paid_tzs ?? 0),
-    customer_paid_tzs: Number(data?.customer_paid_tzs ?? 0),
+    contract_amount: Number(
+      contract?.contract_amount ?? data?.finance?.contract_amount ?? 0,
+    ),
+    contract_currency: String(
+      contract?.contract_currency ?? data?.finance?.contract_currency ?? "USD",
+    ),
+    fx_exchange_rate: Number(data?.finance?.fx_exchange_rate ?? defaultFx),
+    advance_input_type: data?.finance?.advance_input_type ?? "percentage",
+    advance_value: Number(data?.finance?.advance_value ?? 0),
+    advance_paid_usd: Number(data?.finance?.advance_paid_usd ?? 0),
+    advance_paid_tzs: Number(data?.finance?.advance_paid_tzs ?? 0),
+    customer_paid_tzs: Number(data?.finance?.customer_paid_tzs ?? 0),
   };
 
   return (
     <FinanceForm
-      key={`${tripId}-${data?.updated_at ?? "new"}`}
+      key={`${tripId}-${data?.finance?.updated_at ?? "new"}-${contract?.updated_at ?? "noc"}`}
       tripId={tripId}
+      contract={contract}
       initial={initial}
     />
   );
 }
 
-function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) {
+function FinanceForm({
+  tripId,
+  contract,
+  initial,
+}: {
+  tripId: string;
+  contract: any | null;
+  initial: Finance;
+}) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Finance>(initial);
   const [busy, setBusy] = useState(false);
 
   const rate = draft.fx_exchange_rate > 0 ? draft.fx_exchange_rate : 1;
   const isUsd = draft.contract_currency === "USD";
+  const hasContract = Boolean(contract);
 
   // ─── Contract in both currencies ────────────────────────
   const contractTzs = isUsd ? draft.contract_amount * rate : draft.contract_amount;
@@ -123,7 +161,117 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
 
   return (
     <div className="space-y-4 border-t pt-4">
-      {/* ── Freight Contract ─────────────────────────────────── */}
+      {/* ── Contract details (reference) ────────────────────── */}
+      {hasContract ? (
+        <section className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Link2 className="size-4 text-primary" />
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Contract details
+            </h3>
+          </div>
+
+          <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Route
+              </dt>
+              <dd className="mt-0.5 truncate font-medium">
+                {contract.route || "—"}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Origin
+              </dt>
+              <dd className="mt-0.5 truncate font-medium">
+                {contract.origin || "—"}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Destination
+              </dt>
+              <dd className="mt-0.5 truncate font-medium">
+                {contract.destination || "—"}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Distance
+              </dt>
+              <dd className="mt-0.5 font-medium">
+                {Number(contract.distance_km ?? 0).toLocaleString()} km
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Outbound rate
+              </dt>
+              <dd className="mt-0.5 font-medium">
+                {contract.contract_currency ?? "USD"}{" "}
+                {Number(contract.rate_go ?? 0).toLocaleString()} / km
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Return rate
+              </dt>
+              <dd className="mt-0.5 font-medium">
+                {contract.contract_currency ?? "USD"}{" "}
+                {Number(contract.rate_return ?? 0).toLocaleString()} / km
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Total tonnage
+              </dt>
+              <dd className="mt-0.5 font-medium">
+                {Number(contract.total_ton ?? 0).toLocaleString()} T
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Trucks on contract
+              </dt>
+              <dd className="mt-0.5 font-medium">
+                {Number(contract.total_trucks ?? 0).toLocaleString()}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Contract amount
+              </dt>
+              <dd className="mt-0.5 font-semibold">
+                {contract.contract_currency ?? "USD"}{" "}
+                {Number(contract.contract_amount ?? 0).toLocaleString()}
+              </dd>
+            </div>
+          </dl>
+
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            These values come from the linked contract. To change them, edit the
+            contract itself.
+          </p>
+        </section>
+      ) : (
+        <section className="rounded-lg border border-warning/40 bg-warning/5 p-4">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning-foreground" />
+            <div className="text-sm">
+              <p className="font-medium text-warning-foreground">
+                No contract linked to this trip
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Close this dialog, edit the trip, and pick a Contract from the
+                dropdown. The amount, currency and route will fill automatically.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Freight Contract (editable remainder) ───────────── */}
       <section className="rounded-lg border bg-muted/20 p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Freight Contract
@@ -132,25 +280,42 @@ function FinanceForm({ tripId, initial }: { tripId: string; initial: Finance }) 
           <div>
             <Label className="mb-1.5 block text-sm font-medium">
               Total contract amount
+              {hasContract ? (
+                <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                  (from contract)
+                </span>
+              ) : null}
             </Label>
             <Input
               type="number"
               min="0"
               step="any"
               value={draft.contract_amount}
+              readOnly={hasContract}
               onChange={(e) =>
                 setDraft((d) => ({ ...d, contract_amount: num(e.target.value) }))
               }
+              className={hasContract ? "cursor-default bg-muted/40" : undefined}
             />
           </div>
           <div>
-            <Label className="mb-1.5 block text-sm font-medium">Currency</Label>
+            <Label className="mb-1.5 block text-sm font-medium">
+              Currency
+              {hasContract ? (
+                <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                  (from contract)
+                </span>
+              ) : null}
+            </Label>
             <select
               value={draft.contract_currency}
+              disabled={hasContract}
               onChange={(e) =>
                 setDraft((d) => ({ ...d, contract_currency: e.target.value }))
               }
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className={`h-9 w-full rounded-md border border-input bg-background px-3 text-sm ${
+                hasContract ? "cursor-not-allowed opacity-70" : ""
+              }`}
             >
               <option value="TZS">TZS</option>
               <option value="USD">USD</option>
