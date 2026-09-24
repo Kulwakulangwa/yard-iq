@@ -26,6 +26,13 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 const db = supabase as never as { from: (t: string) => any };
 
+function daysUntil(value: unknown): number | null {
+  if (!value) return null;
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.round((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
 function useOffice() {
   return useQuery({
     queryKey: ["office-dashboard"],
@@ -56,7 +63,7 @@ function useOffice() {
         db.from("fuel_allocations").select("*"),
         db.from("exceptions").select("*"),
         db.from("customers").select("id,name"),
-        db.from("drivers").select("id,full_name"),
+        db.from("drivers").select("id,full_name,licence_expiry,passport_expiry"),
         db.from("trip_vehicles").select("*"),
       ]);
       const arr = (r: any) => (r?.data ?? []) as any[];
@@ -194,10 +201,24 @@ function Dashboard() {
   const loadsToVerify = d?.loads.filter((l) => ["Loaded", "Awaiting Loading", "Loading"].includes(l.status)).length ?? 0;
   const available = d?.vehicles.filter((v) => v.status === "Available").length ?? 0;
   const inMaint = d?.vehicles.filter((v) => v.status === "In Maintenance").length ?? 0;
-  const openInvoices = d?.invoices.filter((i) => i.status !== "Paid").length ?? 0;
   const todayExpense =
     d?.expenses.filter((e) => String(e.expense_date ?? "").slice(0, 10) === today).reduce((s, e) => s + Number(e.amount ?? 0), 0) ?? 0;
   const openExceptions = d?.exceptions.filter((e) => e.status === "Open") ?? [];
+
+  // ─── Document expiry counts (licence ≤ 60d, passport ≤ 90d, plus expired) ───
+  const licenceExpiring = (d?.drivers ?? []).filter((dr) => {
+    const days = daysUntil(dr.licence_expiry);
+    return days !== null && days <= 60;
+  }).length;
+  const passportExpiring = (d?.drivers ?? []).filter((dr) => {
+    const days = daysUntil(dr.passport_expiry);
+    return days !== null && days <= 90;
+  }).length;
+  const documentsExpiring = (d?.drivers ?? []).filter((dr) => {
+    const lic = daysUntil(dr.licence_expiry);
+    const p = daysUntil(dr.passport_expiry);
+    return (lic !== null && lic <= 60) || (p !== null && p <= 90);
+  }).length;
 
   const filteredTrips = (d?.trips ?? []).filter((t) => {
     if (tab === "transit") return IN_TRANSIT.includes(t.status);
@@ -208,11 +229,12 @@ function Dashboard() {
 
   return (
     <>
-      <PageHeader title="Office Dashboard" subtitle="Revenue, cash and live trip status across the border fleet" />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <>
+      {/* ─── Sticky header + stat cards ─────────────────────────── */}
+      <div className="sticky top-14 z-10 -mx-3 -mt-3 border-b bg-background/95 px-3 pt-3 pb-3 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:pt-5 lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-6 xl:-mx-8 xl:-mt-8 xl:px-8 xl:pt-8">
+        <PageHeader title="Office Dashboard" subtitle="Revenue, cash and live trip status across the border fleet" />
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Stat label="Contract revenue" value={tzs(revenueTzs)} hint={usd(revenueTzs / fx)} tone="green" />
             <Stat label="Cash disbursed" value={tzs(cashDisbursed)} hint={usd(cashDisbursed / fx)} tone="orange" />
@@ -223,136 +245,144 @@ function Dashboard() {
             <Stat label="Loads to verify" value={loadsToVerify} tone="violet" />
             <Stat label="Vehicles available" value={available} tone="green" />
             <Stat label="In maintenance" value={inMaint} tone="red" />
-            <Stat label="Open invoices" value={openInvoices} tone="blue" />
+            <Stat
+              label="Documents expiring"
+              value={documentsExpiring}
+              hint={`${licenceExpiring} licence${licenceExpiring === 1 ? "" : "s"} · ${passportExpiring} passport${passportExpiring === 1 ? "" : "s"}`}
+              tone={documentsExpiring > 0 ? "red" : "green"}
+            />
             <Stat label="Today's expenses" value={tzs(todayExpense)} tone="orange" />
             <Stat label="Exceptions to approve" value={openExceptions.length} tone="red" />
           </div>
+        )}
+      </div>
 
-          <Card className="mt-5 p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-semibold">Trips</h2>
-              <Link to="/m/$slug" params={{ slug: "trips" }} className="text-sm text-primary hover:underline">
-                Manage trips
-              </Link>
-            </div>
-            <Tabs value={tab} onValueChange={setTab}>
-              <TabsList className="flex-wrap">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="transit">In transit</TabsTrigger>
-                <TabsTrigger value="settlement">Pending settlement</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-              </TabsList>
-            </Tabs>
+      {/* ─── Scrollable lower section ───────────────────────────── */}
+      <div className="mt-5">
+        <Card className="p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-semibold">Trips</h2>
+            <Link to="/m/$slug" params={{ slug: "trips" }} className="text-sm text-primary hover:underline">
+              Manage trips
+            </Link>
+          </div>
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="transit">In transit</TabsTrigger>
+              <TabsTrigger value="settlement">Pending settlement</TabsTrigger>
+              <TabsTrigger value="completed">Completed</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[920px] text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 pr-3">Trip</th>
-                    <th className="py-2 pr-3">Customer</th>
-                    <th className="py-2 pr-3">Route</th>
-                    <th className="py-2 pr-3">Trucks / Drivers</th>
-                    <th className="py-2 pr-3">Contract value</th>
-                    <th className="py-2 pr-3">Current location</th>
-                    <th className="py-2 pr-3">Status</th>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[920px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2 pr-3">Trip</th>
+                  <th className="py-2 pr-3">Customer</th>
+                  <th className="py-2 pr-3">Route</th>
+                  <th className="py-2 pr-3">Trucks / Drivers</th>
+                  <th className="py-2 pr-3">Contract value</th>
+                  <th className="py-2 pr-3">Current location</th>
+                  <th className="py-2 pr-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTrips.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-muted-foreground">
+                      No trips in this view.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredTrips.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-6 text-center text-muted-foreground">
-                        No trips in this view.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredTrips.slice(0, 25).map((t) => {
-                      const f = finByTrip.get(t.id);
-                      const trucks = trucksByTrip.get(String(t.id)) ?? [];
-                      return (
-                        <tr key={t.id} className="border-b last:border-0 align-top">
-                          <td className="py-3 pr-3 font-medium">{t.trip_number}</td>
-                          <td className="py-3 pr-3">{nameOf(d?.customers, t.customer_id, "name")}</td>
-                          <td className="py-3 pr-3 text-muted-foreground">
-                            {t.origin} → {t.destination}
-                          </td>
-                          <td className="py-3 pr-3">
-                            {trucks.length === 0 ? (
-                              <span className="text-muted-foreground">—</span>
-                            ) : (
-                              <div className="space-y-1.5">
-                                {trucks.map((tr, i) => (
-                                  <div key={i} className="leading-tight">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-medium">{tr.vehicle}</span>
-                                      <span className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                                        {tr.role}
-                                      </span>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {tr.driver}
-                                    </div>
+                ) : (
+                  filteredTrips.slice(0, 25).map((t) => {
+                    const f = finByTrip.get(t.id);
+                    const trucks = trucksByTrip.get(String(t.id)) ?? [];
+                    return (
+                      <tr key={t.id} className="border-b last:border-0 align-top">
+                        <td className="py-3 pr-3 font-medium">{t.trip_number}</td>
+                        <td className="py-3 pr-3">{nameOf(d?.customers, t.customer_id, "name")}</td>
+                        <td className="py-3 pr-3 text-muted-foreground">
+                          {t.origin} → {t.destination}
+                        </td>
+                        <td className="py-3 pr-3">
+                          {trucks.length === 0 ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {trucks.map((tr, i) => (
+                                <div key={i} className="leading-tight">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium">{tr.vehicle}</span>
+                                    <span className="rounded-full border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                      {tr.role}
+                                    </span>
                                   </div>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3 pr-3">
-                            {f ? (
-                              <span>
-                                {tzs(f.total_contract_tzs)}
-                                <span className="block text-xs text-muted-foreground">
-                                  {usd(f.contract_currency === "USD" ? f.contract_amount : Number(f.total_contract_tzs ?? 0) / fx)}
-                                </span>
+                                  <div className="text-xs text-muted-foreground">
+                                    {tr.driver}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3">
+                          {f ? (
+                            <span>
+                              {tzs(f.total_contract_tzs)}
+                              <span className="block text-xs text-muted-foreground">
+                                {usd(f.contract_currency === "USD" ? f.contract_amount : Number(f.total_contract_tzs ?? 0) / fx)}
                               </span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 pr-3">
-                            {t.current_location ? (
-                              <span>
-                                {t.current_location}
-                                <span className="block text-xs text-muted-foreground">{timeAgo(t.current_location_at)}</span>
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">Not reported</span>
-                            )}
-                          </td>
-                          <td className="py-3 pr-3">
-                            <StatusBadge value={t.status} />
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3">
+                          {t.current_location ? (
+                            <span>
+                              {t.current_location}
+                              <span className="block text-xs text-muted-foreground">{timeAgo(t.current_location_at)}</span>
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Not reported</span>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3">
+                          <StatusBadge value={t.status} />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
 
-          <Card className="mt-5 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold">Exceptions requiring approval</h2>
-              <Link to="/approvals" className="text-sm text-primary hover:underline">
-                Open approvals
-              </Link>
-            </div>
-            {openExceptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nothing waiting. Everything matches the plan.</p>
-            ) : (
-              <ul className="divide-y">
-                {openExceptions.slice(0, 6).map((e) => (
-                  <li key={e.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                    <span className="font-medium">{e.exception_number}</span>
-                    <span className="text-muted-foreground">{e.exception_type}</span>
-                    <StatusBadge value={e.severity} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </>
-      )}
+        <Card className="mt-5 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">Exceptions requiring approval</h2>
+            <Link to="/approvals" className="text-sm text-primary hover:underline">
+              Open approvals
+            </Link>
+          </div>
+          {openExceptions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing waiting. Everything matches the plan.</p>
+          ) : (
+            <ul className="divide-y">
+              {openExceptions.slice(0, 6).map((e) => (
+                <li key={e.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                  <span className="font-medium">{e.exception_number}</span>
+                  <span className="text-muted-foreground">{e.exception_type}</span>
+                  <StatusBadge value={e.severity} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
     </>
   );
 }
