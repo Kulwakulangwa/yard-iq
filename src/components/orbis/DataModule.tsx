@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Download, Eye, FileText, MapPin, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
+import { Check, Download, Eye, FileText, MoreHorizontal, Pencil, Plus, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { modules, type ModuleConfig } from "@/lib/modules";
 import { exportCsv, formatValue, humanize, logAudit } from "@/lib/orbis";
 import { syncTrucksForTrip } from "@/lib/tripStatusSync";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -22,10 +23,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "./AppShell";
 import { StatusBadge } from "./StatusBadge";
 import { ModuleStats } from "./ModuleStats";
-import { ConvoyLegRows, ago, useConvoyLegs } from "./ConvoyRows";
+import { ConvoyLegRows, useConvoyLegs } from "./ConvoyRows";
 import { useRecordEditor } from "./RecordEditor";
 
 type Row = Record<string, unknown>;
+
+// ───────────────────────────────────────────────────────────────
+// Direction colouring (trips only)
+// ───────────────────────────────────────────────────────────────
+const DIRECTION_ROW_BORDER: Record<string, string> = {
+  Outbound: "border-l-blue-500",
+  Return: "border-l-amber-500",
+};
+
+const DIRECTION_PILL: Record<string, string> = {
+  Outbound: "border-blue-500/40 bg-blue-500/10 text-blue-400",
+  Return: "border-amber-500/40 bg-amber-500/10 text-amber-400",
+};
 
 export function useRows(table: string) {
   return useQuery({
@@ -38,30 +52,6 @@ export function useRows(table: string) {
   });
 }
 
-function CurrentLocationCell({ row }: { row: Row }) {
-  const loc = row["current_location"] ? String(row["current_location"]) : "";
-  const at = row["current_location_at"] ? String(row["current_location_at"]) : "";
-  const by = row["current_location_by"] ? String(row["current_location_by"]) : "";
-
-  if (!loc) {
-    return <span className="text-xs text-muted-foreground">Not reported</span>;
-  }
-
-  return (
-    <div className="min-w-0 max-w-[200px]">
-      <div className="flex items-center gap-1.5">
-        <MapPin className="size-3.5 shrink-0 text-primary" />
-        <span className="truncate font-medium">{loc}</span>
-      </div>
-      <div className="ml-5 text-xs text-muted-foreground">
-        {at ? ago(at) : ""}
-        {at && by ? " · " : ""}
-        {by || ""}
-      </div>
-    </div>
-  );
-}
-
 export function DataModule({
   config,
   readOnlyNotice,
@@ -71,7 +61,7 @@ export function DataModule({
 }) {
   const qc = useQueryClient();
   const { data: rows = [], isLoading } = useRows(config.table);
-  const { dialog, openNew, openEdit, refLabel } = useRecordEditor(config, rows);
+  const { dialog, openNew, openEdit, refLabel, refs } = useRecordEditor(config, rows);
   const [term, setTerm] = useState("");
   const [tab, setTab] = useState("All");
   const slug = Object.entries(modules).find(([, module]) => module.table === config.table)?.[0];
@@ -117,6 +107,7 @@ export function DataModule({
     }));
   }, [rows, config.statusKey, statusOrder]);
 
+  // ─── Search matches raw fields + resolved labels of any `ref` field ───
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
     let list = rows;
@@ -124,12 +115,30 @@ export function DataModule({
       list = list.filter((r) => String(r[config.statusKey!] ?? "") === tab);
     }
     if (t) {
-      list = list.filter((r) => config.searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(t)));
+      list = list.filter((r) => {
+        // 1. Direct fields listed in searchKeys
+        if (config.searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(t))) {
+          return true;
+        }
+        // 2. Any ref field — resolve the id to its display label and search that
+        for (const f of config.fields) {
+          if (f.type !== "ref" || !f.refTable) continue;
+          const id = r[f.key];
+          if (!id) continue;
+          const label = refs[f.refTable]?.find((o) => o.id === String(id))?.label;
+          if (label && label.toLowerCase().includes(t)) return true;
+        }
+        return false;
+      });
     }
     return list;
-  }, [rows, term, tab, config.searchKeys, config.statusKey]);
+  }, [rows, term, tab, config.searchKeys, config.statusKey, config.fields, refs]);
 
   const colSpan = config.columns.length + 1;
+
+  const placeholder = isTrips
+    ? "Search trip, customer, driver, vehicle…"
+    : `Search ${config.title.toLowerCase()}…`;
 
   return (
     <>
@@ -159,7 +168,7 @@ export function DataModule({
           <Input
             value={term}
             onChange={(e) => setTerm(e.target.value)}
-            placeholder={`Search ${config.title.toLowerCase()}…`}
+            placeholder={placeholder}
             className="min-w-0 lg:max-w-sm"
           />
           {tabs.length > 0 ? (
@@ -212,28 +221,56 @@ export function DataModule({
                     currentIdx >= 0 && currentIdx < statusOrder.length - 1
                       ? statusOrder[currentIdx + 1]
                       : null;
+
+                  // Direction (trips only)
+                  const direction = isTrips ? String(row["direction"] ?? "Outbound") : "";
+                  const rowBorderClass =
+                    isTrips && DIRECTION_ROW_BORDER[direction]
+                      ? `border-l-4 ${DIRECTION_ROW_BORDER[direction]}`
+                      : "";
+
                   return (
                     <React.Fragment key={id}>
-                      <TableRow className="cursor-pointer">
+                      <TableRow className={cn("cursor-pointer", rowBorderClass)}>
                         {config.columns.map((c) => {
                           const field = config.fields.find((f) => f.key === c);
+
+                          // Special trip-number cell: trip code + direction pill + truck count
+                          if (isTrips && c === config.columns[0]) {
+                            return (
+                              <TableCell key={c} className="whitespace-nowrap align-top">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-medium">{String(row[c] ?? "")}</span>
+                                  {direction ? (
+                                    <span
+                                      className={cn(
+                                        "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                        DIRECTION_PILL[direction] ?? "",
+                                      )}
+                                    >
+                                      {direction}
+                                    </span>
+                                  ) : null}
+                                  {legs.length > 0 ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+                                      <Users className="size-3" />{" "}
+                                      {legs.length === 1 ? "1 truck" : `${legs.length} trucks`}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </TableCell>
+                            );
+                          }
+
                           return (
                             <TableCell key={c} className="whitespace-nowrap align-top">
-                              {isTrips && c === "current_location" ? (
-                                <CurrentLocationCell row={row} />
-                              ) : c === config.statusKey ? (
+                              {c === config.statusKey ? (
                                 <StatusBadge value={row[c] ? String(row[c]) : null} />
                               ) : field?.type === "ref" ? (
                                 refLabel(field.refTable, row[c])
                               ) : (
                                 formatValue(row[c])
                               )}
-                              {isTrips && c === config.columns[0] && legs.length > 0 ? (
-                                <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-primary/40 px-2 py-0.5 text-[11px] text-primary">
-                                  <Users className="size-3" />{" "}
-                                  {legs.length === 1 ? "1 truck" : `${legs.length} trucks`}
-                                </span>
-                              ) : null}
                             </TableCell>
                           );
                         })}
