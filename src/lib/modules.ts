@@ -8,7 +8,6 @@ export type FieldType =
   | "ref"
   | "boolean";
 
-/** Names of the lookup maps exposed by useRelatedIndex(). */
 export type RefResolveKey =
   | "tripsByCustomer"
   | "tripsByVehicle"
@@ -29,26 +28,12 @@ export type Field = {
   options?: string[];
   refTable?: RefTable;
   readOnly?: boolean;
-  /** Hard filter on option properties — e.g. only is_trailer=false. */
   refFilter?: { key: string; value: unknown };
-  /**
-   * Contextual filter. When set, the field's options are restricted to
-   * whatever the pivot field (`by`) maps to via the lookup (`resolve`).
-   * Options outside that set render faded with a small hint.
-   * If the pivot is empty, no filtering happens.
-   */
   refRule?: {
     by: string;
     resolve: RefResolveKey;
-    /** Auto-fill this field with the first match when the pivot changes,
-     *  but only if the field is currently empty. */
     autoFill?: boolean;
   };
-  /**
-   * When a ref is picked, copy these columns from the referenced record
-   * into these form fields. Only fills targets that are currently empty.
-   * Format: { sourceColumnInRefTable: targetFieldKey }
-   */
   copyFields?: Record<string, string>;
 };
 
@@ -185,6 +170,12 @@ export const modules = {
           destination: "destination",
           distance_km: "planned_distance",
         },
+      },
+      {
+        key: "direction",
+        label: "Direction",
+        type: "select",
+        options: ["Outbound", "Return"],
       },
       { key: "origin", label: "Origin (auto from contract)" },
       { key: "destination", label: "Destination (auto from contract)" },
